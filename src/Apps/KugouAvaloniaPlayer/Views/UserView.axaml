@@ -249,7 +249,7 @@
                                             Cursor="Hand"
                                             Command="{Binding OpenEqSettingsCommand}"
                                             ToolTip.Tip="自定义EQ曲线">
-                                        <Svg Path="/Assets/gear-svgrepo-com.svg" Width="18" Height="14" />
+                                        <Svg Classes="ThemeSvgIcon" Path="/Assets/gear-svgrepo-com.svg" Width="18" Height="14" />
                                     </Button>
                                 </Grid>
                             </Grid>
@@ -707,7 +707,7 @@
                                     Command="{Binding OpenRepositoryCommand}"
                                     Cursor="Hand"
                                     ToolTip.Tip="项目主页">
-                                    <Svg Path="/Assets/github.svg" Width="25" Height="25"/>
+                                    <Svg Classes="ThemeSvgIcon" Path="/Assets/github.svg" Width="25" Height="25"/>
                                 </Button>
                                 
                             </Grid>

@@ -201,8 +201,8 @@
                                                 Height="28"
                                                 IsEnabled="{Binding CanEditFmConfiguration}"
                                                 Command="{Binding CyclePersonalFmModeCommand}">
-                                            <Svg Path="/Assets/switch-up.svg"
-                                                 Css="path { stroke: white; }"
+                                            <Svg Classes="ThemeSvgIcon"
+                                                 Path="/Assets/switch-up.svg"
                                                  Width="15"
                                                  Height="15" />
                                         </Button>
@@ -278,8 +278,8 @@
                                             Padding="2,2,-2,0"
                                             IsVisible="{Binding ShowFmControls}"
                                             Command="{Binding PlayPersonalFmCommand}">
-                                        <Svg Path="{Binding FmPlayIconPath}"
-                                             Css="path { fill: #806BFF; }"
+                                        <Svg Classes="ThemeSvgIcon"
+                                             Path="{Binding FmPlayIconPath}"
                                              Width="18"
                                              Height="18" />
                                     </Button>
@@ -297,7 +297,8 @@
                                         ToolTip.Tip="不喜欢"
                                         IsVisible="{Binding ShowFmControls}"
                                         Command="{Binding DislikePersonalFmCommand}">
-                                    <Svg Path="/Assets/unlike-svgrepo-com.svg"
+                                    <Svg Classes="ThemeSvgIcon"
+                                         Path="/Assets/unlike-svgrepo-com.svg"
                                          Width="17"
                                          Height="17" />
                                 </Button>

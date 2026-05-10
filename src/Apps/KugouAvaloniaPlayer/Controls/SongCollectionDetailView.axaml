@@ -177,7 +177,7 @@
                                     Command="{Binding #Root.PlayFirstSongCommand}"
                                     Cursor="Hand">
                                 <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <Svg Path="/Assets/play-1003-svgrepo-com.svg" Width="16" Height="16" />
+                                    <Svg Classes="ThemeSvgIcon" Path="/Assets/play-1003-svgrepo-com.svg" Width="16" Height="16" />
                                     <TextBlock Text="播放全部" VerticalAlignment="Center" />
                                 </StackPanel>
                             </Button>
@@ -190,7 +190,8 @@
                                     VerticalAlignment="Center"
                                     Cursor="Hand">
                                 <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <Svg Path="{Binding #Root.HeroActionSvgPath}"
+                                    <Svg Classes="ThemeSvgIcon"
+                                         Path="{Binding #Root.HeroActionSvgPath}"
                                          Width="16"
                                          Height="16"
                                          IsVisible="{Binding #Root.HasHeroActionSvgPath}" />

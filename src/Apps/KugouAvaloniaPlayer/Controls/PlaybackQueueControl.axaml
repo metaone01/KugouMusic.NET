@@ -182,7 +182,8 @@
                     <Border Width="30" Height="30"
                             CornerRadius="8"
                             Background="{StaticResource AccentLight}">
-                        <Svg Path="/Assets/FormatList.svg"
+                        <Svg Classes="ThemeSvgIcon"
+                             Path="/Assets/FormatList.svg"
                              Width="16" Height="16"
                              HorizontalAlignment="Center"
                              VerticalAlignment="Center" />
@@ -214,7 +215,7 @@
                         ToolTip.Tip="清空队列"
                         VerticalAlignment="Center">
                     <StackPanel Orientation="Horizontal" Spacing="4">
-                        <Svg Path="/Assets/trash-svgrepo-com.svg" Width="15" Height="15" />
+                        <Svg Classes="ThemeSvgIcon" Path="/Assets/trash-svgrepo-com.svg" Width="15" Height="15" />
                         <TextBlock Text="清空"
                                    FontSize="12"
                                    Foreground="{StaticResource TextSecondary}"
@@ -282,7 +283,8 @@
                                         CornerRadius="12"
                                         Background="{DynamicResource SukiAccentColor75}"
                                         IsVisible="{Binding IsPlaying}">
-                                    <Svg Path="/Assets/music-party-svgrepo-com.svg"
+                                    <Svg Classes="ThemeSvgIcon"
+                                         Path="/Assets/music-party-svgrepo-com.svg"
                                          Width="13" Height="13"
                                          HorizontalAlignment="Center"
                                          VerticalAlignment="Center" />
@@ -323,7 +325,7 @@
                                         Command="{Binding #Root.((vm:MainWindowViewModel)DataContext).Player.PlaySongCommand}"
                                         CommandParameter="{Binding .}"
                                         Foreground="{DynamicResource SukiLowText}">
-                                    <Svg Path="/Assets/Play-2.svg" Width="10" Height="10" />
+                                    <Svg Classes="ThemeSvgIcon" Path="/Assets/Play-2.svg" Width="10" Height="10" />
                                 </Button>
                                 <Button Classes="Basic"
                                         ToolTip.Tip="移除"

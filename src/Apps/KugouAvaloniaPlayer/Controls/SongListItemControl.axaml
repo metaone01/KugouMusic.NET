@@ -51,14 +51,14 @@
                 <Button Cursor="Hand" Classes="Basic" ToolTip.Tip="播放"
                         Command="{Binding PlayCommand}"
                         CommandParameter="{Binding .}">
-                    <Svg Path="/Assets/Play-2.svg" Width="15" Height="15" />
+                    <Svg Classes="ThemeSvgIcon" Path="/Assets/Play-2.svg" Width="15" Height="15" />
                 </Button>
 
                 <Button Cursor="Hand" x:Name="MoreButton"
                         Classes="Basic"
                         ToolTip.Tip="更多操作"
                         Click="MoreButton_OnClick">
-                    <Svg Path="/Assets/More.svg" Width="25" Height="25" />
+                    <Svg Classes="ThemeSvgIcon" Path="/Assets/More.svg" Width="25" Height="25" />
                 </Button>
             </StackPanel>
         </Grid>

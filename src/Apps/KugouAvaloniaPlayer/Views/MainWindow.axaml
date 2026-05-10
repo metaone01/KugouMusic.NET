@@ -180,6 +180,7 @@
                         <Grid ColumnDefinitions="20,*"
                               Margin="{TemplateBinding Padding}">
                             <Svg Name="SectionChevron"
+                                 Classes="ThemeSvgIcon"
                                  Path="/Assets/NavigateNext.svg"
                                  Width="14"
                                  Height="14"
@@ -241,7 +242,7 @@
                 <DataTemplate DataType="vm:PageViewModelBase">
                     <suki:SukiSideMenuItem Header="{Binding DisplayName}" FontFamily="Default">
                         <suki:SukiSideMenuItem.Icon>
-                            <Svg Path="{Binding Icon}" VerticalAlignment="Center" HorizontalAlignment="Center" />
+                            <Svg Classes="ThemeSvgIcon" Path="{Binding Icon}" VerticalAlignment="Center" HorizontalAlignment="Center" />
                         </suki:SukiSideMenuItem.Icon>
                     </suki:SukiSideMenuItem>
                 </DataTemplate>
@@ -413,6 +414,7 @@
                                                     VerticalAlignment="Center"
                                                     Background="{DynamicResource SukiPrimaryColorLow}" />
                                             <Svg Grid.Column="0"
+                                                 Classes="ThemeSvgIcon"
                                                  Path="/Assets/music-folder-8-svgrepo-com.svg"
                                                  HorizontalAlignment="Center"
                                                  VerticalAlignment="Center" />
@@ -450,6 +452,7 @@
                                     VerticalAlignment="Center"
                                     Background="{DynamicResource SukiPrimaryColorLow}" />
                             <Svg Grid.Column="0"
+                                 Classes="ThemeSvgIcon"
                                  Path="/Assets/music-folder-8-svgrepo-com.svg"
                                  HorizontalAlignment="Center"
                                  VerticalAlignment="Center" />
