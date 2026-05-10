@@ -1,6 +1,7 @@
 #if KUGOU_WINDOWS
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.InteropServices;
 using Avalonia.Controls;
 using KugouAvaloniaPlayer.Models;
@@ -63,20 +64,20 @@ public sealed partial class GlobalShortcutService
 
     private IntPtr WindowProc(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
+        handled = false;
+
         if (msg != WmHotKey)
             return IntPtr.Zero;
 
         var hotKeyId = wParam.ToInt32();
-        foreach (var pair in _registeredIds)
-        {
-            if (pair.Value != hotKeyId)
-                continue;
 
+        foreach (var pair in _registeredIds.Where(pair => pair.Value == hotKeyId))
+        {
             handled = true;
             DispatchAction(pair.Key);
             return IntPtr.Zero;
         }
-
+        
         return IntPtr.Zero;
     }
 
