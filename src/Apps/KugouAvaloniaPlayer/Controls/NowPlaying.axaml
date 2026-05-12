@@ -425,10 +425,11 @@
                                             </MultiBinding>
                                         </Grid.IsVisible>
                                         <ItemsControl ItemsSource="{Binding Words}"
+                                                      Width="{Binding $parent[controls1:MeasuredLyricScrollView].Bounds.Width}"
                                                       HorizontalAlignment="{Binding $parent[UserControl].((vm:NowPlayingViewModel)DataContext).LyricHorizontalAlignment}">
                                             <ItemsControl.ItemsPanel>
                                                 <ItemsPanelTemplate>
-                                                    <StackPanel Orientation="Horizontal" />
+                                                    <controls1:AlignedWrapPanel HorizontalContentAlignment="{Binding $parent[UserControl].((vm:NowPlayingViewModel)DataContext).LyricHorizontalAlignment}" />
                                                 </ItemsPanelTemplate>
                                             </ItemsControl.ItemsPanel>
                                             <ItemsControl.ItemTemplate>
@@ -455,10 +456,11 @@
                                             </MultiBinding>
                                         </Grid.IsVisible>
                                         <ItemsControl ItemsSource="{Binding Words}"
+                                                      Width="{Binding $parent[controls1:MeasuredLyricScrollView].Bounds.Width}"
                                                       HorizontalAlignment="{Binding $parent[UserControl].((vm:NowPlayingViewModel)DataContext).LyricHorizontalAlignment}">
                                             <ItemsControl.ItemsPanel>
                                                 <ItemsPanelTemplate>
-                                                    <StackPanel Orientation="Horizontal" />
+                                                    <controls1:AlignedWrapPanel HorizontalContentAlignment="{Binding $parent[UserControl].((vm:NowPlayingViewModel)DataContext).LyricHorizontalAlignment}" />
                                                 </ItemsPanelTemplate>
                                             </ItemsControl.ItemsPanel>
                                             <ItemsControl.ItemTemplate>
@@ -505,10 +507,11 @@
                                             </MultiBinding>
                                         </Grid.IsVisible>
                                         <ItemsControl ItemsSource="{Binding TranslationWords}"
+                                                      Width="{Binding $parent[controls1:MeasuredLyricScrollView].Bounds.Width}"
                                                       HorizontalAlignment="{Binding $parent[UserControl].((vm:NowPlayingViewModel)DataContext).LyricHorizontalAlignment}">
                                             <ItemsControl.ItemsPanel>
                                                 <ItemsPanelTemplate>
-                                                    <StackPanel Orientation="Horizontal" />
+                                                    <controls1:AlignedWrapPanel HorizontalContentAlignment="{Binding $parent[UserControl].((vm:NowPlayingViewModel)DataContext).LyricHorizontalAlignment}" />
                                                 </ItemsPanelTemplate>
                                             </ItemsControl.ItemsPanel>
                                             <ItemsControl.ItemTemplate>
@@ -536,10 +539,11 @@
                                             </MultiBinding>
                                         </Grid.IsVisible>
                                         <ItemsControl ItemsSource="{Binding TranslationWords}"
+                                                      Width="{Binding $parent[controls1:MeasuredLyricScrollView].Bounds.Width}"
                                                       HorizontalAlignment="{Binding $parent[UserControl].((vm:NowPlayingViewModel)DataContext).LyricHorizontalAlignment}">
                                             <ItemsControl.ItemsPanel>
                                                 <ItemsPanelTemplate>
-                                                    <StackPanel Orientation="Horizontal" />
+                                                    <controls1:AlignedWrapPanel HorizontalContentAlignment="{Binding $parent[UserControl].((vm:NowPlayingViewModel)DataContext).LyricHorizontalAlignment}" />
                                                 </ItemsPanelTemplate>
                                             </ItemsControl.ItemsPanel>
                                             <ItemsControl.ItemTemplate>
