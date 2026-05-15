@@ -254,7 +254,7 @@
 
             <suki:SukiSideMenu.ItemTemplate>
                 <DataTemplate DataType="vm:PageViewModelBase">
-                    <suki:SukiSideMenuItem Header="{Binding DisplayName}" FontFamily="Default">
+                    <suki:SukiSideMenuItem Header="{Binding DisplayName}" FontWeight="Bold">
                         <suki:SukiSideMenuItem.Icon>
                             <Svg Classes="ThemeSvgIcon" Path="{Binding Icon}" VerticalAlignment="Center" HorizontalAlignment="Center" />
                         </suki:SukiSideMenuItem.Icon>
