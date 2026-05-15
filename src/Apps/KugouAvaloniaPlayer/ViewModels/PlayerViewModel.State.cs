@@ -339,8 +339,6 @@ public partial class PlayerViewModel
         CurrentLyricLine = activeLine;
         CurrentLyricIndex = activeIndex;
         NextLyricLine = nextLine;
-        CurrentLyricText = activeLine?.Content ?? (preserveExistingText ? CurrentLyricText : "暂无歌词");
-        CurrentLyricTrans = activeLine?.Translation ?? (preserveExistingText ? CurrentLyricTrans : "");
     }
 
     private static string GetQualitySwitchFailureMessage(PlaybackSourceFailureReason reason)

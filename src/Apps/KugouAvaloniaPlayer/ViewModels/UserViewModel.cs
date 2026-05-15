@@ -80,9 +80,6 @@ public partial class UserViewModel : PageViewModelBase
     public partial bool DesktopLyricDoubleLineEnabled { get; set; }
 
     [ObservableProperty]
-    public partial bool EnableLegacyWordLyricEffect { get; set; }
-
-    [ObservableProperty]
     public partial bool EnableGlobalShortcuts { get; set; }
 
     [ObservableProperty]
@@ -187,7 +184,6 @@ public partial class UserViewModel : PageViewModelBase
         EnableVolumeNormalization = SettingsManager.Settings.EnableVolumeNormalization;
         EnableSeamlessTransition = SettingsManager.Settings.EnableSeamlessTransition;
         EnableNowPlayingVisualizer = SettingsManager.Settings.EnableNowPlayingVisualizer;
-        EnableLegacyWordLyricEffect = SettingsManager.Settings.EnableLegacyWordLyricEffect;
         DesktopLyricDoubleLineEnabled = SettingsManager.Settings.DesktopLyricDoubleLineEnabled;
         LyricFontFamilyOptions = LoadSystemFontFamilies();
         _availableLyricFonts = new HashSet<string>(LyricFontFamilyOptions, StringComparer.OrdinalIgnoreCase);
@@ -525,16 +521,6 @@ public partial class UserViewModel : PageViewModelBase
         Player.SetNowPlayingVisualizerEnabled(value);
     }
 
-    partial void OnEnableLegacyWordLyricEffectChanged(bool value)
-    {
-        if (_isApplyingSettingsSnapshot) return;
-
-        SettingsManager.Settings.EnableLegacyWordLyricEffect = value;
-        SettingsManager.Save();
-        NotifyLyricStyleChanged(LyricSettingsScope.Desktop);
-        NotifyLyricStyleChanged(LyricSettingsScope.PlayPage);
-    }
-
     partial void OnDesktopLyricDoubleLineEnabledChanged(bool value)
     {
         if (_isApplyingSettingsSnapshot) return;
@@ -776,7 +762,6 @@ public partial class UserViewModel : PageViewModelBase
             EnableVolumeNormalization = SettingsManager.Settings.EnableVolumeNormalization;
             EnableSeamlessTransition = SettingsManager.Settings.EnableSeamlessTransition;
             EnableNowPlayingVisualizer = SettingsManager.Settings.EnableNowPlayingVisualizer;
-            EnableLegacyWordLyricEffect = SettingsManager.Settings.EnableLegacyWordLyricEffect;
             DesktopLyricDoubleLineEnabled = SettingsManager.Settings.DesktopLyricDoubleLineEnabled;
 
             LoadDesktopLyricColorEditorFromSettings();
@@ -999,8 +984,7 @@ public partial class UserViewModel : PageViewModelBase
                 : SettingsManager.Settings.PlayPageLyricAlignment,
             isDesktop
                 ? SettingsManager.Settings.DesktopLyricFontSize
-                : SettingsManager.Settings.PlayPageLyricFontSize,
-            SettingsManager.Settings.EnableLegacyWordLyricEffect));
+                : SettingsManager.Settings.PlayPageLyricFontSize));
     }
 
     private static LyricAlignmentOption ParseAlignment(string? alignment)

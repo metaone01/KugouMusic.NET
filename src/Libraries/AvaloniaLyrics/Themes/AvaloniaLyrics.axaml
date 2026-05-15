@@ -1,14 +1,15 @@
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:controls="clr-namespace:KugouAvaloniaPlayer.Controls">
+        xmlns:lyrics="clr-namespace:AvaloniaLyrics;assembly=AvaloniaLyrics">
 
-    <Design.PreviewWith>
-        <controls:MeasuredLyricScrollView Width="260" Height="300" />
-    </Design.PreviewWith>
-
-    <Style Selector="controls|MeasuredLyricScrollView">
+    <Style Selector="lyrics|LyricView">
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="ClipToBounds" Value="True" />
+        <Setter Property="Preset" Value="Default" />
+        <Setter Property="ActiveAnchorRatio" Value="0.5" />
+        <Setter Property="EnableAnimation" Value="False" />
+        <Setter Property="EnableStagger" Value="False" />
+        <Setter Property="EnableScale" Value="False" />
         <Setter Property="Template">
             <ControlTemplate>
                 <Border Background="{TemplateBinding Background}"

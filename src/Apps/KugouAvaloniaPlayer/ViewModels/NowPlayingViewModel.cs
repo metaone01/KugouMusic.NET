@@ -68,7 +68,6 @@ public partial class NowPlayingViewModel : ViewModelBase, IDisposable
                 message.FontFamilyName,
                 message.Alignment,
                 message.FontSize);
-            EnableLegacyWordLyricEffect = message.EnableLegacyWordLyricEffect;
         });
 
         WeakReferenceMessenger.Default.Register<NowPlayingBackgroundOpacityChangedMessage>(this, (_, message) =>
@@ -84,10 +83,6 @@ public partial class NowPlayingViewModel : ViewModelBase, IDisposable
 
     [ObservableProperty]
     public partial bool IsVolumeVisible { get; set; }
-
-    [ObservableProperty]
-    public partial bool EnableLegacyWordLyricEffect { get; set; } =
-        SettingsManager.Settings.EnableLegacyWordLyricEffect;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CoverBackgroundOpacity))]

@@ -4,49 +4,55 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
 
-namespace KugouAvaloniaPlayer.Controls;
+namespace AvaloniaLyrics;
 
-public class KaraokeGradientTextBlock : Control
+public class KaraokeTextBlock : Control
 {
     public static readonly StyledProperty<string?> TextProperty =
-        AvaloniaProperty.Register<KaraokeGradientTextBlock, string?>(nameof(Text));
+        AvaloniaProperty.Register<KaraokeTextBlock, string?>(nameof(Text));
 
     public static readonly StyledProperty<double> ProgressProperty =
-        AvaloniaProperty.Register<KaraokeGradientTextBlock, double>(nameof(Progress));
+        AvaloniaProperty.Register<KaraokeTextBlock, double>(nameof(Progress));
 
     public static readonly StyledProperty<IBrush> ForegroundProperty =
-        AvaloniaProperty.Register<KaraokeGradientTextBlock, IBrush>(nameof(Foreground), Brushes.White);
+        AvaloniaProperty.Register<KaraokeTextBlock, IBrush>(nameof(Foreground), Brushes.White);
 
     public static readonly StyledProperty<IBrush> PlayedForegroundProperty =
-        AvaloniaProperty.Register<KaraokeGradientTextBlock, IBrush>(nameof(PlayedForeground), Brushes.White);
+        AvaloniaProperty.Register<KaraokeTextBlock, IBrush>(nameof(PlayedForeground), Brushes.White);
 
     public static readonly StyledProperty<double> UnplayedOpacityProperty =
-        AvaloniaProperty.Register<KaraokeGradientTextBlock, double>(nameof(UnplayedOpacity), 0.34);
+        AvaloniaProperty.Register<KaraokeTextBlock, double>(nameof(UnplayedOpacity), 0.34d);
 
     public static readonly StyledProperty<double> PlayedOpacityProperty =
-        AvaloniaProperty.Register<KaraokeGradientTextBlock, double>(nameof(PlayedOpacity), 1);
+        AvaloniaProperty.Register<KaraokeTextBlock, double>(nameof(PlayedOpacity), 1d);
 
     public static readonly StyledProperty<double> FontSizeProperty =
-        TextBlock.FontSizeProperty.AddOwner<KaraokeGradientTextBlock>();
+        TextBlock.FontSizeProperty.AddOwner<KaraokeTextBlock>();
 
     public static readonly StyledProperty<FontFamily?> FontFamilyProperty =
-        AvaloniaProperty.Register<KaraokeGradientTextBlock, FontFamily?>(nameof(FontFamily));
+        AvaloniaProperty.Register<KaraokeTextBlock, FontFamily?>(nameof(FontFamily));
 
     public static readonly StyledProperty<FontWeight> FontWeightProperty =
-        TextBlock.FontWeightProperty.AddOwner<KaraokeGradientTextBlock>();
+        TextBlock.FontWeightProperty.AddOwner<KaraokeTextBlock>();
 
     public static readonly StyledProperty<FontStyle> FontStyleProperty =
-        TextBlock.FontStyleProperty.AddOwner<KaraokeGradientTextBlock>();
+        TextBlock.FontStyleProperty.AddOwner<KaraokeTextBlock>();
 
     public static readonly StyledProperty<TextAlignment> TextAlignmentProperty =
-        TextBlock.TextAlignmentProperty.AddOwner<KaraokeGradientTextBlock>();
+        TextBlock.TextAlignmentProperty.AddOwner<KaraokeTextBlock>();
 
     public static readonly StyledProperty<TextWrapping> TextWrappingProperty =
-        TextBlock.TextWrappingProperty.AddOwner<KaraokeGradientTextBlock>();
+        TextBlock.TextWrappingProperty.AddOwner<KaraokeTextBlock>();
 
-    static KaraokeGradientTextBlock()
+    public static readonly StyledProperty<KaraokeClipMode> ClipModeProperty =
+        AvaloniaProperty.Register<KaraokeTextBlock, KaraokeClipMode>(nameof(ClipMode), KaraokeClipMode.ByTextWidth);
+
+    public static readonly StyledProperty<bool> UsePlayedGradientProperty =
+        AvaloniaProperty.Register<KaraokeTextBlock, bool>(nameof(UsePlayedGradient), true);
+
+    static KaraokeTextBlock()
     {
-        AffectsMeasure<KaraokeGradientTextBlock>(
+        AffectsMeasure<KaraokeTextBlock>(
             TextProperty,
             FontSizeProperty,
             FontFamilyProperty,
@@ -55,7 +61,7 @@ public class KaraokeGradientTextBlock : Control
             TextAlignmentProperty,
             TextWrappingProperty);
 
-        AffectsRender<KaraokeGradientTextBlock>(
+        AffectsRender<KaraokeTextBlock>(
             TextProperty,
             ProgressProperty,
             ForegroundProperty,
@@ -67,7 +73,9 @@ public class KaraokeGradientTextBlock : Control
             FontWeightProperty,
             FontStyleProperty,
             TextAlignmentProperty,
-            TextWrappingProperty);
+            TextWrappingProperty,
+            ClipModeProperty,
+            UsePlayedGradientProperty);
     }
 
     public string? Text
@@ -142,6 +150,18 @@ public class KaraokeGradientTextBlock : Control
         set => SetValue(TextWrappingProperty, value);
     }
 
+    public KaraokeClipMode ClipMode
+    {
+        get => GetValue(ClipModeProperty);
+        set => SetValue(ClipModeProperty, value);
+    }
+
+    public bool UsePlayedGradient
+    {
+        get => GetValue(UsePlayedGradientProperty);
+        set => SetValue(UsePlayedGradientProperty, value);
+    }
+
     protected override Size MeasureOverride(Size availableSize)
     {
         var formattedText = CreateFormattedText(availableSize.Width, CreateOpacityBrush(Foreground, UnplayedOpacity));
@@ -160,15 +180,21 @@ public class KaraokeGradientTextBlock : Control
         var formattedText = CreateFormattedText(Bounds.Width, unplayedBrush);
         var origin = new Point(0, Math.Max(0, (Bounds.Height - formattedText.Height) / 2));
 
-        var progress = Math.Clamp(Progress, 0, 1);
-        if (progress <= 0)
+        var progress = Math.Clamp(Progress, 0d, 1d);
+        if (progress <= 0d)
         {
             context.DrawText(formattedText, origin);
             return;
         }
 
-        var clipWidth = Math.Max(0, Bounds.Width * progress);
-        if (clipWidth <= 0)
+        var clipWidth = ClipMode switch
+        {
+            KaraokeClipMode.ByControlWidth => Bounds.Width * progress,
+            _ => formattedText.WidthIncludingTrailingWhitespace * progress
+        };
+
+        clipWidth = Math.Clamp(clipWidth, 0d, Bounds.Width);
+        if (clipWidth <= 0d)
         {
             context.DrawText(formattedText, origin);
             return;
@@ -217,7 +243,7 @@ public class KaraokeGradientTextBlock : Control
     private IBrush CreatePlayedBrush()
     {
         var playedBrush = CreateOpacityBrush(PlayedForeground, PlayedOpacity);
-        if (playedBrush is not ISolidColorBrush solid)
+        if (!UsePlayedGradient || playedBrush is not ISolidColorBrush solid)
             return playedBrush;
 
         var color = solid.Color;
@@ -237,15 +263,11 @@ public class KaraokeGradientTextBlock : Control
 
     private static IBrush CreateOpacityBrush(IBrush brush, double opacity)
     {
-        opacity = Math.Clamp(opacity, 0, 1);
-        if (brush is ISolidColorBrush solid)
+        opacity = Math.Clamp(opacity, 0d, 1d);
+        if (brush is ISolidColorBrush solidBrush)
         {
-            var color = solid.Color;
-            return new SolidColorBrush(Color.FromArgb(
-                (byte)Math.Round(color.A * opacity),
-                color.R,
-                color.G,
-                color.B));
+            var color = solidBrush.Color;
+            return new SolidColorBrush(color, solidBrush.Opacity * opacity);
         }
 
         return brush;

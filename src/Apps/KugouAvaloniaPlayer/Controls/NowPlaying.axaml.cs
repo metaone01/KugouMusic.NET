@@ -33,13 +33,13 @@ public partial class NowPlaying : UserControl
         if (_nowPlayingViewModel != null)
             _nowPlayingViewModel.PropertyChanged += OnNowPlayingPropertyChanged;
         if (_playerViewModel != null)
-            _playerViewModel.LyricLines.CollectionChanged += OnLyricLinesChanged;
+            _playerViewModel.RenderLyricLines.CollectionChanged += OnLyricLinesChanged;
     }
 
     private void UnhookViewModel()
     {
         if (_playerViewModel != null)
-            _playerViewModel.LyricLines.CollectionChanged -= OnLyricLinesChanged;
+            _playerViewModel.RenderLyricLines.CollectionChanged -= OnLyricLinesChanged;
         if (_nowPlayingViewModel == null) return;
         _nowPlayingViewModel.PropertyChanged -= OnNowPlayingPropertyChanged;
         _nowPlayingViewModel = null;
@@ -57,7 +57,7 @@ public partial class NowPlaying : UserControl
 
     private void OnLyricLinesChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
-        if (_nowPlayingViewModel?.IsOpen != true || _playerViewModel?.LyricLines.Count <= 0)
+        if (_nowPlayingViewModel?.IsOpen != true || _playerViewModel?.RenderLyricLines.Count <= 0)
             return;
 
         Dispatcher.Post(() => { LyricScrollView?.ForceSecondPassLayout(); }, DispatcherPriority.Render);

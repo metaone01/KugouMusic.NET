@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Media;
+using AvaloniaLyrics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
@@ -40,9 +41,6 @@ public partial class DesktopLyricViewModel : ViewModelBase, IDisposable
     public partial bool IsCollapsedLockIconHovered { get; set; }
 
     [ObservableProperty]
-    public partial bool EnableLegacyWordLyricEffect { get; set; }
-
-    [ObservableProperty]
     public partial bool IsTranslationVisible { get; set; } = true;
 
     [ObservableProperty]
@@ -63,10 +61,13 @@ public partial class DesktopLyricViewModel : ViewModelBase, IDisposable
     public partial IBrush TranslationWordForeground { get; set; } = DefaultTranslationWordBrush;
 
     [ObservableProperty]
-    public partial LyricLineViewModel? TopLyricLine { get; set; }
+    public partial LyricLine? CurrentRenderLyricLine { get; set; }
 
     [ObservableProperty]
-    public partial LyricLineViewModel? BottomLyricLine { get; set; }
+    public partial LyricLine? TopLyricLine { get; set; }
+
+    [ObservableProperty]
+    public partial LyricLine? BottomLyricLine { get; set; }
 
     [ObservableProperty]
     public partial bool IsTopLyricLineCurrent { get; set; }
@@ -96,7 +97,6 @@ public partial class DesktopLyricViewModel : ViewModelBase, IDisposable
         CanMousePassthrough = canMousePassthrough;
         UsesSeparateLockOverlay = canMousePassthrough && usesSeparateLockOverlay;
         IsControlBarExpanded = false;
-        EnableLegacyWordLyricEffect = SettingsManager.Settings.EnableLegacyWordLyricEffect;
         FontSize = ClampFontSize(SettingsManager.Settings.DesktopLyricFontSize);
         IsTranslationVisible = SettingsManager.Settings.DesktopLyricShowTranslation;
         IsDoubleLineEnabled = SettingsManager.Settings.DesktopLyricDoubleLineEnabled;
@@ -120,7 +120,6 @@ public partial class DesktopLyricViewModel : ViewModelBase, IDisposable
                 message.TranslationColorHex,
                 message.UseCustomFont,
                 message.FontFamilyName);
-            EnableLegacyWordLyricEffect = message.EnableLegacyWordLyricEffect;
         });
 
         WeakReferenceMessenger.Default.Register<DesktopLyricDoubleLineChangedMessage>(this, (_, message) =>
@@ -145,22 +144,18 @@ public partial class DesktopLyricViewModel : ViewModelBase, IDisposable
     public bool IsDesktopTranslationActuallyVisible => IsTranslationVisible && !IsDoubleLineEnabled;
     public bool IsTopLyricLineVisible => IsDoubleLineEnabled && TopLyricLine != null;
     public bool IsBottomLyricLineVisible => IsDoubleLineEnabled && BottomLyricLine != null;
-    public bool IsTopPlainTextVisible =>
-        IsTopLyricLineVisible && (!IsTopLyricLineCurrent || TopLyricLine?.IsKrcWordLevel != true);
-    public bool IsBottomPlainTextVisible =>
-        IsBottomLyricLineVisible && (!IsBottomLyricLineCurrent || BottomLyricLine?.IsKrcWordLevel != true);
-    public bool IsTopLegacyWordsVisible =>
-        IsTopLyricLineVisible && IsTopLyricLineCurrent && TopLyricLine?.IsKrcWordLevel == true &&
-        EnableLegacyWordLyricEffect;
-    public bool IsBottomLegacyWordsVisible =>
-        IsBottomLyricLineVisible && IsBottomLyricLineCurrent && BottomLyricLine?.IsKrcWordLevel == true &&
-        EnableLegacyWordLyricEffect;
-    public bool IsTopGradientWordsVisible =>
-        IsTopLyricLineVisible && IsTopLyricLineCurrent && TopLyricLine?.IsKrcWordLevel == true &&
-        !EnableLegacyWordLyricEffect;
-    public bool IsBottomGradientWordsVisible =>
-        IsBottomLyricLineVisible && IsBottomLyricLineCurrent && BottomLyricLine?.IsKrcWordLevel == true &&
-        !EnableLegacyWordLyricEffect;
+    public LyricLine? SingleLineActiveLine => CurrentRenderLyricLine;
+    public LyricLine? TopActiveLine => IsTopLyricLineCurrent ? TopLyricLine : null;
+    public LyricLine? BottomActiveLine => IsBottomLyricLineCurrent ? BottomLyricLine : null;
+    public LyricWordRenderMode SingleLineWordRenderMode => LyricWordRenderMode.Clip;
+    public LyricWordRenderMode TopLaneWordRenderMode =>
+        !IsTopLyricLineCurrent
+            ? LyricWordRenderMode.Plain
+            : LyricWordRenderMode.Clip;
+    public LyricWordRenderMode BottomLaneWordRenderMode =>
+        !IsBottomLyricLineCurrent
+            ? LyricWordRenderMode.Plain
+            : LyricWordRenderMode.Clip;
 
     [RelayCommand]
     private void ToggleLock()
@@ -208,6 +203,13 @@ public partial class DesktopLyricViewModel : ViewModelBase, IDisposable
         SettingsManager.Save();
         OnPropertyChanged(nameof(IsDesktopTranslationActuallyVisible));
         OnPropertyChanged(nameof(WindowHeight));
+        OnPropertyChanged(nameof(SingleLineActiveLine));
+    }
+
+    partial void OnCurrentRenderLyricLineChanged(LyricLine? value)
+    {
+        OnPropertyChanged(nameof(SingleLineActiveLine));
+        OnPropertyChanged(nameof(WindowHeight));
     }
 
     partial void OnIsDoubleLineEnabledChanged(bool value)
@@ -218,11 +220,6 @@ public partial class DesktopLyricViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(IsDesktopTranslationActuallyVisible));
         OnPropertyChanged(nameof(WindowHeight));
         RefreshDoubleLineLanes();
-    }
-
-    partial void OnEnableLegacyWordLyricEffectChanged(bool value)
-    {
-        RaiseDoubleLineComputedProperties();
     }
 
     partial void OnIsLockedChanged(bool value)
@@ -291,17 +288,18 @@ public partial class DesktopLyricViewModel : ViewModelBase, IDisposable
 
     private void RefreshDoubleLineLanes()
     {
-        var currentLine = Player.CurrentLyricLine;
         var currentIndex = Player.CurrentLyricIndex;
+        CurrentRenderLyricLine = GetRenderLineAt(currentIndex);
 
-        if (!IsDoubleLineEnabled || currentLine == null || currentIndex < 0)
+        if (!IsDoubleLineEnabled || CurrentRenderLyricLine == null || currentIndex < 0)
         {
             SetTopLaneImmediate(null, false);
             SetBottomLaneImmediate(null, false);
             return;
         }
 
-        var nextLine = Player.NextLyricLine;
+        var currentLine = CurrentRenderLyricLine;
+        var nextLine = GetRenderLineAt(currentIndex + 1);
         if (currentIndex % 2 == 0)
         {
             SetTopLane(currentLine, true);
@@ -314,7 +312,7 @@ public partial class DesktopLyricViewModel : ViewModelBase, IDisposable
         }
     }
 
-    private void SetTopLane(LyricLineViewModel? line, bool isCurrent)
+    private void SetTopLane(LyricLine? line, bool isCurrent)
     {
         if (ReferenceEquals(TopLyricLine, line))
         {
@@ -332,7 +330,7 @@ public partial class DesktopLyricViewModel : ViewModelBase, IDisposable
         _ = AnimateTopLaneChangeAsync(line, isCurrent);
     }
 
-    private void SetBottomLane(LyricLineViewModel? line, bool isCurrent)
+    private void SetBottomLane(LyricLine? line, bool isCurrent)
     {
         if (ReferenceEquals(BottomLyricLine, line))
         {
@@ -350,7 +348,7 @@ public partial class DesktopLyricViewModel : ViewModelBase, IDisposable
         _ = AnimateBottomLaneChangeAsync(line, isCurrent);
     }
 
-    private void SetTopLaneImmediate(LyricLineViewModel? line, bool isCurrent)
+    private void SetTopLaneImmediate(LyricLine? line, bool isCurrent)
     {
         CancelAndDisposeTopLaneAnimation();
         TopLyricLine = line;
@@ -360,7 +358,7 @@ public partial class DesktopLyricViewModel : ViewModelBase, IDisposable
         RaiseDoubleLineComputedProperties();
     }
 
-    private void SetBottomLaneImmediate(LyricLineViewModel? line, bool isCurrent)
+    private void SetBottomLaneImmediate(LyricLine? line, bool isCurrent)
     {
         CancelAndDisposeBottomLaneAnimation();
         BottomLyricLine = line;
@@ -370,7 +368,7 @@ public partial class DesktopLyricViewModel : ViewModelBase, IDisposable
         RaiseDoubleLineComputedProperties();
     }
 
-    private async Task AnimateTopLaneChangeAsync(LyricLineViewModel line, bool isCurrent)
+    private async Task AnimateTopLaneChangeAsync(LyricLine line, bool isCurrent)
     {
         CancelAndDisposeTopLaneAnimation();
         var cts = new CancellationTokenSource();
@@ -396,7 +394,7 @@ public partial class DesktopLyricViewModel : ViewModelBase, IDisposable
         }
     }
 
-    private async Task AnimateBottomLaneChangeAsync(LyricLineViewModel line, bool isCurrent)
+    private async Task AnimateBottomLaneChangeAsync(LyricLine line, bool isCurrent)
     {
         CancelAndDisposeBottomLaneAnimation();
         var cts = new CancellationTokenSource();
@@ -446,12 +444,17 @@ public partial class DesktopLyricViewModel : ViewModelBase, IDisposable
     {
         OnPropertyChanged(nameof(IsTopLyricLineVisible));
         OnPropertyChanged(nameof(IsBottomLyricLineVisible));
-        OnPropertyChanged(nameof(IsTopPlainTextVisible));
-        OnPropertyChanged(nameof(IsBottomPlainTextVisible));
-        OnPropertyChanged(nameof(IsTopLegacyWordsVisible));
-        OnPropertyChanged(nameof(IsBottomLegacyWordsVisible));
-        OnPropertyChanged(nameof(IsTopGradientWordsVisible));
-        OnPropertyChanged(nameof(IsBottomGradientWordsVisible));
+        OnPropertyChanged(nameof(TopActiveLine));
+        OnPropertyChanged(nameof(BottomActiveLine));
+        OnPropertyChanged(nameof(TopLaneWordRenderMode));
+        OnPropertyChanged(nameof(BottomLaneWordRenderMode));
+    }
+
+    private LyricLine? GetRenderLineAt(int index)
+    {
+        return index >= 0 && index < Player.RenderLyricLines.Count
+            ? Player.RenderLyricLines[index]
+            : null;
     }
 
     private void ApplyLyricStyleSettings(

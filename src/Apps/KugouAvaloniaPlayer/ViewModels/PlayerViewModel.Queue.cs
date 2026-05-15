@@ -184,8 +184,6 @@ public partial class PlayerViewModel
         _playbackCoordinator.InvalidatePendingLoads();
         _player.Stop();
         IsPlayingAudio = false;
-        CurrentLyricText = "---";
-        CurrentLyricTrans = "";
         CurrentLyricLine = null;
         CurrentLyricIndex = -1;
         NextLyricLine = null;

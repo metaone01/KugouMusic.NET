@@ -32,8 +32,7 @@ public record LyricStyleSettingsChangedMessage(
     bool UseCustomFont,
     string FontFamilyName,
     LyricAlignmentOption Alignment,
-    double FontSize,
-    bool EnableLegacyWordLyricEffect);
+    double FontSize);
 
 public record DesktopLyricDoubleLineChangedMessage(bool IsEnabled);
 

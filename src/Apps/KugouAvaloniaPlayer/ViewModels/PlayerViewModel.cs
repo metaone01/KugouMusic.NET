@@ -4,6 +4,7 @@ using System.Collections.Specialized;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using AvaloniaLyrics;
 using Avalonia.Collections;
 using Avalonia.Controls.Notifications;
 using Avalonia.Threading;
@@ -69,18 +70,13 @@ public partial class PlayerViewModel : ViewModelBase, IDisposable
     public partial int CurrentLyricIndex { get; set; } = -1;
 
     [ObservableProperty]
-    public partial string CurrentLyricText { get; set; } = "---";
-
-    [ObservableProperty]
-    public partial string CurrentLyricTrans { get; set; } = "";
-
-    [ObservableProperty]
     public partial LyricLineViewModel? NextLyricLine { get; set; }
 
     [ObservableProperty]
     public partial SongItem? CurrentPlayingSong { get; set; }
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CurrentPosition))]
     public partial double CurrentPositionSeconds { get; set; }
 
     private int _disposeState;
@@ -196,10 +192,12 @@ public partial class PlayerViewModel : ViewModelBase, IDisposable
     public AvaloniaList<SongItem> PlaybackQueue => _queueManager.PlaybackQueue;
     public AvaloniaList<SongItem> DisplayPlaybackQueue { get; } = new();
     public AvaloniaList<LyricLineViewModel> LyricLines => _lyricsService.LyricLines;
+    public AvaloniaList<LyricLine> RenderLyricLines => _lyricsService.RenderLyricLines;
     public AvaloniaList<AudioVisualizerBarViewModel> NowPlayingVisualizerBars { get; } = CreateVisualizerBars();
     public string[] QualityOptions { get; } = ["128", "320", "flac", "high"];
     public int DisplayPlaybackQueueCount => DisplayPlaybackQueue.Count;
     public bool HasDisplayPlaybackQueue => DisplayPlaybackQueue.Count > 0;
+    public TimeSpan CurrentPosition => TimeSpan.FromSeconds(CurrentPositionSeconds);
 
     public bool IsRepeatOneMode => _queueManager.IsRepeatOneMode;
     public bool IsShuffleMode => _queueManager.IsShuffleMode;
@@ -304,7 +302,6 @@ public partial class PlayerViewModel : ViewModelBase, IDisposable
                 TotalDurationSeconds =
                     song.DurationSeconds > 0 ? song.DurationSeconds : _player.GetDuration().TotalSeconds;
                 _playbackTimer.Start();
-                CurrentLyricText = "歌词加载中...";
                 _ = _historyService.RecordPlayedAsync(song);
                 _ = EnsurePreparedNextTrackAsync(requestVersion, currentLoadCts.Token);
             }

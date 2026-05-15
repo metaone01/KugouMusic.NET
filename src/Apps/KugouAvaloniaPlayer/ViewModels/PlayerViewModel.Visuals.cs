@@ -45,8 +45,6 @@ public partial class PlayerViewModel
 
             CurrentLyricLine = null;
             CurrentLyricIndex = -1;
-            CurrentLyricText = "暂无歌词";
-            CurrentLyricTrans = "";
             NextLyricLine = null;
         }
         finally
