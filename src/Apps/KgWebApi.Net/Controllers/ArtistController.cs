@@ -1,3 +1,4 @@
+using KuGou.Net.Abstractions.Models;
 using KuGou.Net.Clients;
 using Microsoft.AspNetCore.Mvc;
 
@@ -66,13 +67,28 @@ public class ArtistController(ArtistClient artistClient) : ControllerBase
         return Ok(await artistClient.GetVideosAsync(id, page, pagesize, tag));
     }
 
+    /// <summary>
+    ///     获取歌手详情。
+    /// </summary>
+    /// <param name="id">歌手 ID。</param>
+    /// <returns>歌手详情。</returns>
     [HttpGet("detail")]
+    [ProducesResponseType(typeof(SingerDetailResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetDetail([FromQuery] string id)
     {
         return Ok(await artistClient.GetDetailAsync(id));
     }
 
+    /// <summary>
+    ///     获取歌手歌曲。
+    /// </summary>
+    /// <param name="id">歌手 ID。</param>
+    /// <param name="page">页码。</param>
+    /// <param name="pagesize">每页数量。</param>
+    /// <param name="sort">排序方式:new/hot</param>
+    /// <returns>歌手歌曲分页结果。</returns>
     [HttpGet("audios")]
+    [ProducesResponseType(typeof(SingerAudioResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAudios(
         [FromQuery] string id,
         [FromQuery] int page = 1,

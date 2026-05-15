@@ -1,10 +1,11 @@
+using KuGou.Net.Abstractions.Models;
 using KuGou.Net.Clients;
 using Microsoft.AspNetCore.Mvc;
 
 namespace KgWebApi.Net.Controllers;
 
 /// <summary>
-///     搜索相关API接口 - 使用新的KuGou.Net库
+///     搜索相关API接口
 /// </summary>
 [ApiController]
 [Route("search")]
@@ -15,7 +16,6 @@ public class SearchController(
 {
     /// <summary>
     ///     搜索歌曲或专辑等
-    ///     GET /search?keywords=海阔天空&page=1
     /// </summary>
     [HttpGet]
     public async Task<IActionResult> Search(
@@ -52,7 +52,14 @@ public class SearchController(
         }
     }
 
+    /// <summary>
+    ///     搜索歌单。
+    /// </summary>
+    /// <param name="keywords">搜索关键词。</param>
+    /// <param name="page">页码。</param>
+    /// <returns>匹配的歌单列表。</returns>
     [HttpGet("special")]
+    [ProducesResponseType(typeof(List<SearchPlaylistItem>), StatusCodes.Status200OK)]
     public async Task<IActionResult> SearchSpecial(
         [FromQuery] string keywords = "",
         [FromQuery] int page = 1)
@@ -79,7 +86,14 @@ public class SearchController(
         }
     }
 
+    /// <summary>
+    ///     搜索专辑。
+    /// </summary>
+    /// <param name="keywords">搜索关键词。</param>
+    /// <param name="page">页码。</param>
+    /// <returns>匹配的专辑列表。</returns>
     [HttpGet("album")]
+    [ProducesResponseType(typeof(List<SearchAlbumItem>), StatusCodes.Status200OK)]
     public async Task<IActionResult> SearchAlbum(
         [FromQuery] string keywords = "",
         [FromQuery] int page = 1)
@@ -109,7 +123,9 @@ public class SearchController(
     /// <summary>
     ///     获取热搜
     /// </summary>
+    /// <returns>热搜关键词和热度信息。</returns>
     [HttpGet("hot")]
+    [ProducesResponseType(typeof(SearchHotResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetHot()
     {
         var result = await searchClient.GetSearchHotAsync();

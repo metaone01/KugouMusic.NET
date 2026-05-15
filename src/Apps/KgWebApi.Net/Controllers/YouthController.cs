@@ -1,3 +1,4 @@
+using KuGou.Net.Abstractions.Models;
 using KuGou.Net.Clients;
 using Microsoft.AspNetCore.Mvc;
 
@@ -111,21 +112,36 @@ public class YouthController(UserClient userService) : ControllerBase
         return Ok(result);
     }
 
+    /// <summary>
+    ///     领取当天 VIP，不可多领。
+    /// </summary>
+    /// <returns>领取结果。</returns>
     [HttpGet("day/vip")]
+    [ProducesResponseType(typeof(OneDayVipModel), StatusCodes.Status200OK)]
     public async Task<IActionResult> OneDayVip()
     {
         var result = await userService.ReceiveOneDayVipAsync();
         return Ok(result);
     }
 
+    /// <summary>
+    ///     升级到概念版VIP。
+    /// </summary>
+    /// <returns>升级结果。</returns>
     [HttpGet("day/vip/upgrade")]
+    [ProducesResponseType(typeof(UpgradeVipModel), StatusCodes.Status200OK)]
     public async Task<IActionResult> UpgradeVip()
     {
         var result = await userService.UpgradeVipRewardAsync();
         return Ok(result);
     }
 
+    /// <summary>
+    ///     获取VIP 领取记录。
+    /// </summary>
+    /// <returns>VIP 领取记录。</returns>
     [HttpGet("month/vip/record")]
+    [ProducesResponseType(typeof(VipReceiveHistoryResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetVipRecordAsync()
     {
         var result = await userService.GetVipRecordAsync();

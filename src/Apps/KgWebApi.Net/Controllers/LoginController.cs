@@ -1,10 +1,11 @@
+using KuGou.Net.Abstractions.Models;
 using KuGou.Net.Clients;
 using Microsoft.AspNetCore.Mvc;
 
 namespace KgWebApi.Net.Controllers;
 
 /// <summary>
-///     登录相关API接口 - 使用新的KuGou.Net库
+///     登录相关API接口
 /// </summary>
 [ApiController]
 [Route("login")]
@@ -13,7 +14,10 @@ public class LoginController(LoginClient loginClient, ILogger<LoginController> l
     /// <summary>
     ///     手机验证码登录
     /// </summary>
+    /// <param name="req">手机号和短信验证码。</param>
+    /// <returns>登录结果和账号 Token 信息。轮询此接口可获取二维码扫码状态, 408 为等待扫描，404 为已经扫描，403 为拒绝登录，405 为登录成功，402 为已过期</returns>
     [HttpPost("cellphone")]
+    [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> LoginByMobile([FromBody] MobileLoginRequest req)
     {
         if (string.IsNullOrWhiteSpace(req.Mobile) || string.IsNullOrWhiteSpace(req.Code))
@@ -34,7 +38,9 @@ public class LoginController(LoginClient loginClient, ILogger<LoginController> l
     /// <summary>
     ///     获取二维码 Key 和链接
     /// </summary>
+    /// <returns>二维码 Key、登录链接和展示信息。</returns>
     [HttpGet("qr/key")]
+    [ProducesResponseType(typeof(QRCode), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetQrKey()
     {
         var result = await loginClient.GetQrCodeAsync();
@@ -46,7 +52,9 @@ public class LoginController(LoginClient loginClient, ILogger<LoginController> l
     ///     检查二维码扫码状态
     /// </summary>
     /// <param name="key">二维码 Key</param>
+    /// <returns>二维码登录状态。</returns>
     [HttpGet("qr/check")]
+    [ProducesResponseType(typeof(QrLoginStatusResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> CheckQrCode([FromQuery] string key)
     {
         if (string.IsNullOrWhiteSpace(key)) return BadRequest(new { status = 0, msg = "Key 不能为空" });
@@ -59,7 +67,9 @@ public class LoginController(LoginClient loginClient, ILogger<LoginController> l
     /// <summary>
     ///     刷新 Token
     /// </summary>
+    /// <returns>刷新后的 Token 信息。</returns>
     [HttpPost("token")]
+    [ProducesResponseType(typeof(RefreshTokenResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> RefreshToken()
     {
         var result = await loginClient.RefreshSessionAsync();

@@ -1,3 +1,4 @@
+using KuGou.Net.Abstractions.Models;
 using KuGou.Net.Clients;
 using Microsoft.AspNetCore.Mvc;
 
@@ -106,7 +107,17 @@ public class SongController(SongClient songClient) : ControllerBase
         return Ok(await songClient.GetImagesAsync(hash, albumIds, albumAudioIds, count));
     }
 
+    /// <summary>
+    ///     获取歌曲图片。
+    /// </summary>
+    /// <param name="hash">歌曲 Hash。</param>
+    /// <param name="audioIds">音频 ID，多个值可用英文逗号分隔。</param>
+    /// <param name="albumAudioIds">专辑音频 ID，多个值可用英文逗号分隔。</param>
+    /// <param name="fileNames">文件名，多个值可用英文逗号分隔。</param>
+    /// <param name="count">返回数量。</param>
+    /// <returns>歌曲图片结果。</returns>
     [HttpGet("/images/audio")]
+    [ProducesResponseType(typeof(AudioImageResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAudioImages(
         [FromQuery] string hash,
         [FromQuery(Name = "audio_id")] string? audioIds = null,
@@ -126,7 +137,17 @@ public class SongController(SongClient songClient) : ControllerBase
         return Ok(await songClient.GetUrlNewAsync(hash, albumAudioId, freePart));
     }
 
+    /// <summary>
+    ///     获取歌曲播放地址。
+    /// </summary>
+    /// <param name="hash">歌曲 Hash。</param>
+    /// <param name="quality">音质。</param>
+    /// <param name="albumId">专辑 ID。</param>
+    /// <param name="albumAudioId">专辑音频 ID。</param>
+    /// <param name="freePart">是否只获取试听片段。</param>
+    /// <returns>播放地址和音频信息。</returns>
     [HttpGet("url")]
+    [ProducesResponseType(typeof(PlayUrlData), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetUrl(
         [FromQuery] string hash,
         [FromQuery] string quality = "128",

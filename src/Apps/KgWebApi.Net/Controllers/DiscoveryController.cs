@@ -1,3 +1,4 @@
+using KuGou.Net.Abstractions.Models;
 using KuGou.Net.Clients;
 using Microsoft.AspNetCore.Mvc;
 
@@ -10,7 +11,11 @@ public class DiscoveryController(RecommendClient recommendClient) : ControllerBa
     /// <summary>
     ///     歌单推荐
     /// </summary>
+    /// <param name="categoryId">分类 ID。0：推荐，11292：HI-RES，其他可以从 /playlist/tags 接口中获取（接口下的 tag_id 为 category_id的值）</param>
+    /// <param name="page">页码。</param>
+    /// <returns>推荐歌单分页结果。</returns>
     [HttpGet("top/playlist")]
+    [ProducesResponseType(typeof(RecommendPlaylistResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetRecommendPlaylist(
         [FromQuery(Name = "category_id")] int categoryId = 0,
         [FromQuery] int page = 1)
@@ -31,21 +36,27 @@ public class DiscoveryController(RecommendClient recommendClient) : ControllerBa
         return Ok(res);
     }
 
-
+    /// <summary>
+    ///     获取每日推荐歌曲。
+    /// </summary>
+    /// <returns>每日推荐歌曲结果。</returns>
     [HttpGet("recommend/songs")]
+    [ProducesResponseType(typeof(DailyRecommendResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetRecommendSong()
     {
         var res = await recommendClient.GetRecommendedSongsAsync();
         return Ok(res);
     }
 
-
+    /*/// <summary>
+    ///     风格推荐
+    /// </summary>
     [HttpGet("everyday/style/recommend")]
     public async Task<IActionResult> GetRecommendStyleSong()
     {
         var res = await recommendClient.GetRecommendedStyleSongsAsync();
         return Ok(res);
-    }
+    }*/
 
     [HttpGet("ai/recommend")]
     public async Task<IActionResult> GetAiRecommend([FromQuery(Name = "album_audio_id")] string? albumAudioIds = null)
@@ -143,17 +154,19 @@ public class DiscoveryController(RecommendClient recommendClient) : ControllerBa
     }
     
     /// <summary>
-    /// 获取私人FM推荐 / 上报电台播放行为
+    /// 获取私人FM推荐 / 上报电台播放行为 (为什么这个接口这么麻烦酷)
     /// </summary>
     /// <param name="hash">音乐 hash</param>
     /// <param name="songid">音乐 songid</param>
     /// <param name="playtime">已播放时间 (秒)</param>
     /// <param name="action">行为: play (获取推荐), garbage (标记为不喜欢)</param>
-    /// <param name="mode">模式: normal (发现), small (小众), peak (30s 高潮)</param>
+    /// <param name="mode">模式: normal (红心), small (小众), peak (30s 速览)</param>
     /// <param name="songPoolId">AI 策略池: 0 (口味Alpha), 1 (风格Beta), 2 (Gamma)</param>
     /// <param name="isOverplay">该歌曲是否自然播放到结束</param>
-    /// <param name="remainSongCnt">列表剩余歌曲数 (如果填5，只会告诉服务器你的行为，不会返回新歌节省带宽)</param>
+    /// <param name="remainSongCnt">列表剩余歌曲数 (如果填5，只会告诉服务器你的行为不会返回歌曲)</param>
+    /// <returns>私人 FM 推荐结果。</returns>
     [HttpGet("personal/fm")]
+    [ProducesResponseType(typeof(PersonalFmResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetPersonalFm([FromQuery] string? hash = null,
         [FromQuery] string? songid = null,
         [FromQuery] int? playtime = null,

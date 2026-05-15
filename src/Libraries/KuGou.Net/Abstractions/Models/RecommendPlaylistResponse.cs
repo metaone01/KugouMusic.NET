@@ -7,9 +7,15 @@ namespace KuGou.Net.Abstractions.Models;
 /// </summary>
 public record RecommendPlaylistResponse : KgBaseModel
 {
+    /// <summary>
+    ///     是否还有下一页。
+    /// </summary>
     [property: JsonPropertyName("has_next")]
     public int HasNext { get; set; }
 
+    /// <summary>
+    ///     推荐歌单列表。
+    /// </summary>
     [property: JsonPropertyName("special_list")]
     public List<RecommendPlaylistItem> Playlists { get; set; } = new();
 }

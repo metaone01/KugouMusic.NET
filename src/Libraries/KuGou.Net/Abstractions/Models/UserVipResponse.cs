@@ -17,13 +17,13 @@ public record UserVipResponse : KgBaseModel
 
 
     /// <summary>
-    ///     是否为概念版 VIP (SVIP) - 对应 product_type: "svip"
+    ///     是否为概念版 VIP (SVIP) 
     /// </summary>
     public bool IsSuperVip => BusiVipList.Any(x =>
         x.ProductType == "svip" && x.IsVip == 1);
 
     /// <summary>
-    ///     是否为畅听 VIP (TVIP) - 对应 product_type: "tvip"
+    ///     是否为畅听 VIP (TVIP) 
     /// </summary>
     public bool IsConceptVip => BusiVipList.Any(x =>
         x.ProductType == "tvip" && x.IsVip == 1);

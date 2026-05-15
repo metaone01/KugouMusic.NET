@@ -14,7 +14,7 @@ public record DailyRecommendResponse : KgBaseModel
     public string Date { get; set; } = "";
 
     /// <summary>
-    ///     封面图 (例如: http://imge.kugou.com/commendpic/...)
+    ///     每日推荐封面图 
     /// </summary>
     [property: JsonPropertyName("cover_img_url")]
     public string CoverUrl { get; set; } = "";
@@ -37,8 +37,6 @@ public record DailyRecommendResponse : KgBaseModel
 /// </summary>
 public record DailyRecommendSong : KgBaseModel
 {
-    // ================= 基础信息 =================
-
     /// <summary>
     ///     歌曲名称
     /// </summary>
@@ -46,7 +44,7 @@ public record DailyRecommendSong : KgBaseModel
     public string Name { get; set; } = "";
 
     /// <summary>
-    ///     歌手名称 (组合字符串)
+    ///     歌手名称 
     /// </summary>
     [property: JsonPropertyName("author_name")]
     public string SingerName { get; set; } = "";
@@ -87,8 +85,6 @@ public record DailyRecommendSong : KgBaseModel
     [property: JsonPropertyName("mixsongid")]
     public string MixSongId { get; set; } = "";
 
-    // ================= 封面与推荐语 =================
-
     /// <summary>
     ///     封面
     /// </summary>
@@ -111,27 +107,35 @@ public record DailyRecommendSong : KgBaseModel
     [property: JsonPropertyName("rec_sub_copy_write")]
     public string RecommendSubReason { get; set; } = "";
 
-    // ================= 音质 Hash 与大小 =================
-
-    // 320K 高品质
+    /// <summary>
+    ///     320K 音质对应的 Hash。
+    /// </summary>
     [property: JsonPropertyName("hash_320")]
     public string Hash320 { get; set; } = "";
 
+    /// <summary>
+    ///     320K 音质文件大小。
+    /// </summary>
     [property: JsonPropertyName("filesize_320")]
     public long FileSize320 { get; set; }
 
-    // Flac 无损
+    /// <summary>
+    ///     FLAC 无损音质对应的 Hash。
+    /// </summary>
     [property: JsonPropertyName("hash_flac")]
     public string HashFlac { get; set; } = "";
 
+    /// <summary>
+    ///     FLAC 无损音质文件大小。
+    /// </summary>
     [property: JsonPropertyName("filesize_flac")]
     public long FileSizeFlac { get; set; }
 
-    // Hi-Res (如果有的话，通常字段是 hash_high)
+    /// <summary>
+    ///     Hi-Res 音质对应的 Hash。
+    /// </summary>
     [property: JsonPropertyName("hash_192")]
     public string HashHiRes { get; set; } = "";
-
-    // ================= 权限与标签 =================
 
     /// <summary>
     ///     权限位 (0=免费, 8=免费/会员混杂, 10=VIP, 1=付费)

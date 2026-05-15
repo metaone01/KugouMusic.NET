@@ -7,11 +7,19 @@ namespace KuGou.Net.Abstractions.Models;
 /// </summary>
 public record UserPlaylistResponse : KgBaseModel
 {
+    /// <summary>
+    ///     当前登录用户 ID。
+    /// </summary>
     [JsonPropertyName("userid")] public long UserId { get; set; }
 
+    /// <summary>
+    ///     当前用户歌单总数。
+    /// </summary>
     [JsonPropertyName("list_count")] public int ListCount { get; set; }
 
-    // 核心列表数据
+    /// <summary>
+    ///     当前页歌单列表。
+    /// </summary>
     [JsonPropertyName("info")] public List<UserPlaylistItem> Playlists { get; set; } = new();
 }
 
@@ -20,25 +28,41 @@ public record UserPlaylistResponse : KgBaseModel
 /// </summary>
 public record UserPlaylistItem : KgBaseModel
 {
-    // 歌单名称
+    /// <summary>
+    ///     歌单名称。
+    /// </summary>
     [JsonPropertyName("name")] public string Name { get; set; } = "";
 
-    // 内部 ID (数字)
+    /// <summary>
+    ///     歌单数字 ID。
+    /// </summary>
     [JsonPropertyName("listid")] public long ListId { get; set; }
 
-
+    /// <summary>
+    ///     歌单全局 ID。
+    /// </summary>
     [JsonPropertyName("global_collection_id")]
     public string GlobalId { get; set; } = "";
 
+    /// <summary>
+    ///     创建来源关联 ID。
+    /// </summary>
     [JsonPropertyName("list_create_gid")] public string ListCreateId { get; set; } = "";
 
+    /// <summary>
+    ///     创建来源歌单 ID。
+    /// </summary>
     [JsonPropertyName("list_create_listid")]
     public long ListCreateListId { get; set; }
 
-    // 歌曲数量
+    /// <summary>
+    ///     歌曲数量。
+    /// </summary>
     [JsonPropertyName("count")] public int Count { get; set; }
 
-    // 封面图 (可能为空字符串)
+    /// <summary>
+    ///     歌单封面图。
+    /// </summary>
     [JsonPropertyName("pic")]
     public string? Pic
     {
@@ -46,23 +70,41 @@ public record UserPlaylistItem : KgBaseModel
         set;
     }
 
-    // 是否默认歌单 (1=默认收藏, 2=我喜欢, 0=自建)
+    /// <summary>
+    ///     是否默认歌单。`1` 表示默认收藏，`2` 表示我喜欢，`0` 表示自建。
+    /// </summary>
     [JsonPropertyName("is_def")] public int IsDefault { get; set; }
 
-    // 创建时间
+    /// <summary>
+    ///     创建时间戳。
+    /// </summary>
     [JsonPropertyName("create_time")] public long CreateTime { get; set; }
 
-    //是否可添加歌曲进歌单
+    /// <summary>
+    ///     歌单类型。
+    /// </summary>
     [JsonPropertyName("type")] public int Type { get; set; }
 
+    /// <summary>
+    ///     媒体库 ID。
+    /// </summary>
     [JsonPropertyName("musiclib_id")] public long MusiclibId { get; set; }
 
+    /// <summary>
+    ///     创建者用户名。
+    /// </summary>
     [JsonPropertyName("list_create_username")]
     public string ListCreateUsername { get; set; } = "";
 
+    /// <summary>
+    ///     是否为收藏专辑生成的歌单。
+    /// </summary>
     [JsonIgnore]
     public bool IsCollectedAlbum => string.IsNullOrWhiteSpace(ListCreateId);
 
+    /// <summary>
+    ///     专辑 ID。优先使用 `MusiclibId`，否则退回到 `ListCreateListId`。
+    /// </summary>
     [JsonIgnore]
     public long AlbumId => MusiclibId > 0 ? MusiclibId : ListCreateListId;
 }

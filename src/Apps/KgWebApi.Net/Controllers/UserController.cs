@@ -1,3 +1,4 @@
+using KuGou.Net.Abstractions.Models;
 using KuGou.Net.Clients;
 using Microsoft.AspNetCore.Mvc;
 
@@ -7,24 +8,43 @@ namespace KgWebApi.Net.Controllers;
 [Route("user")]
 public class UserController(UserClient userClient) : ControllerBase
 {
+    /// <summary>
+    ///     获取当前登录用户详情。
+    /// </summary>
+    /// <returns>用户详情。</returns>
     [HttpGet("detail")]
+    [ProducesResponseType(typeof(UserDetailModel), StatusCodes.Status200OK)]
     public async Task<IActionResult> UserDetail()
     {
         var result = await userClient.GetUserInfoAsync();
         return Ok(result);
     }
 
+    /// <summary>
+    ///     获取当前登录用户 VIP 信息。
+    /// </summary>
+    /// <returns>用户 VIP 信息。</returns>
     [HttpGet("vip/detail")]
+    [ProducesResponseType(typeof(UserVipResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> UserVipDetail()
     {
         var result = await userClient.GetVipInfoAsync();
         return Ok(result);
     }
 
+    /// <summary>
+    ///     分页获取当前登录用户歌单。
+    /// </summary>
+    /// <param name="page">页码。</param>
+    /// <param name="pagesize">每页数量。</param>
+    /// <returns>用户歌单结果。</returns>
     [HttpGet("playlist")]
-    public async Task<IActionResult> UserPlaylist()
+    [ProducesResponseType(typeof(UserPlaylistResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> UserPlaylist(
+        [FromQuery] int page = 1,
+        [FromQuery] int pagesize = 30)
     {
-        var result = await userClient.GetPlaylistsAsync();
+        var result = await userClient.GetPlaylistsAsync(page, pagesize);
         return Ok(result);
     }
 

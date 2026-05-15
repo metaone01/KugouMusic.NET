@@ -1,3 +1,4 @@
+using KuGou.Net.Abstractions.Models;
 using KuGou.Net.Clients;
 using Microsoft.AspNetCore.Mvc;
 
@@ -45,14 +46,25 @@ public class PlayListController(PlaylistClient playlistClient) : ControllerBase
         return Ok(await playlistClient.GetSheetListAsync(albumAudioId, opernType, page, pagesize));
     }
 
+    /// <summary>
+    ///     获取歌单详情。
+    /// </summary>
+    /// <param name="ids">歌单 ID。</param>
+    /// <returns>歌单详情。</returns>
     [HttpGet("detail")]
+    [ProducesResponseType(typeof(PlaylistInfo), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetDetail([FromQuery(Name = "ids")] string ids)
     {
         var result = await playlistClient.GetInfoAsync(ids);
         return Ok(result);
     }
 
+    /// <summary>
+    ///     获取歌单标签分类。
+    /// </summary>
+    /// <returns>歌单标签分类列表。</returns>
     [HttpGet("tags")]
+    [ProducesResponseType(typeof(List<PlaylistTagCategory>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetTags()
     {
         var result = await playlistClient.GetTagsAsync();
@@ -62,7 +74,15 @@ public class PlayListController(PlaylistClient playlistClient) : ControllerBase
         return Ok(result);
     }
 
+    /// <summary>
+    ///     获取歌单全部歌曲。
+    /// </summary>
+    /// <param name="id">歌单 ID。</param>
+    /// <param name="page">页码。</param>
+    /// <param name="pagesize">每页数量。</param>
+    /// <returns>歌单歌曲分页结果。</returns>
     [HttpGet("track/all")]
+    [ProducesResponseType(typeof(PlaylistSongResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetDtrackAll(
         [FromQuery] string id,
         [FromQuery] int page = 1,
@@ -98,6 +118,8 @@ public class PlayListController(PlaylistClient playlistClient) : ControllerBase
 
     /// <summary>
     ///     收藏歌单
+    /// <param name="name">歌单名称。</param>
+    /// <param name="list_create_gid">歌单 ID。</param>
     /// </summary>
     [HttpPost("add")]
     public async Task<IActionResult> AddPlaylist(
@@ -110,6 +132,8 @@ public class PlayListController(PlaylistClient playlistClient) : ControllerBase
 
     /// <summary>
     ///     新建歌单
+    /// <param name="name">歌单名称。</param>
+    /// <param name="type">是否设为隐私，0：公开，1：隐私，仅支持创建歌单时传入</param>
     /// </summary>
     [HttpPost("create")]
     public async Task<IActionResult> CreatePlaylist(
@@ -122,7 +146,6 @@ public class PlayListController(PlaylistClient playlistClient) : ControllerBase
 
     /// <summary>
     ///     取消收藏 / 删除歌单
-    ///     路由: POST /PlayList/del?listid=xxx
     /// </summary>
     [HttpPost("del")]
     public async Task<IActionResult> DeletePlaylist([FromQuery] string listid)
@@ -133,9 +156,11 @@ public class PlayListController(PlaylistClient playlistClient) : ControllerBase
 
     /// <summary>
     ///     对歌单添加歌曲
-    ///     路由: POST /PlayList/tracks/add?listid=xx&data=歌名|Hash|AlbumId...
     /// </summary>
+    /// <param name="request">要添加的歌曲列表。</param>
+    /// <returns>添加歌曲结果。</returns>
     [HttpPost("tracks/add")]
+    [ProducesResponseType(typeof(AddSongResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> AddTracks([FromBody] AddTracksRequest request)
     {
         if (string.IsNullOrEmpty(request.ListId))
@@ -158,9 +183,12 @@ public class PlayListController(PlaylistClient playlistClient) : ControllerBase
 
     /// <summary>
     ///     对歌单删除歌曲
-    ///     路由: POST /PlayList/tracks/del?listid=xx&fileids=123,456
     /// </summary>
+    /// <param name="listid">目标歌单 ID。</param>
+    /// <param name="fileids">歌曲 fileid，多个值用英文逗号分隔。</param>
+    /// <returns>删除歌曲结果。</returns>
     [HttpPost("tracks/del")]
+    [ProducesResponseType(typeof(RemoveSongResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> DeleteTracks([FromQuery] string listid, [FromQuery] string fileids)
     {
         if (string.IsNullOrEmpty(fileids)) return BadRequest("fileids cannot be empty");

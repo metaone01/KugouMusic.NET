@@ -22,7 +22,7 @@ builder.Services.AddOpenApi(options =>
         {
             Title = "KuGou Music API",
             Version = "v1",
-            Description = "酷狗音乐API - 使用新的KuGou.Net库"
+            Description = "酷狗音乐API"
         };
         return Task.CompletedTask;
     });

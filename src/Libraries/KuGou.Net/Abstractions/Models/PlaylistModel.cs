@@ -2,38 +2,62 @@ using System.Text.Json.Serialization;
 
 namespace KuGou.Net.Abstractions.Models;
 
+/// <summary>
+///     歌单详情。
+/// </summary>
 public record PlaylistInfo : KgBaseModel
 {
-    // 歌单 ID (listid)
+    /// <summary>
+    ///     用户歌单列表 ID。
+    /// </summary>
     [property: JsonPropertyName("listid")] public long Id { get; set; }
 
-    // 全局 ID (这是后续调其他接口最常用的)
+    /// <summary>
+    ///     歌单 ID。
+    /// </summary>
     [property: JsonPropertyName("global_collection_id")]
     public string GlobalId { get; set; } = "";
 
-    // 歌单名称
+    /// <summary>
+    ///     歌单名称。
+    /// </summary>
     [property: JsonPropertyName("name")] public string Name { get; set; } = "";
 
-    // 封面图片
+    /// <summary>
+    ///     封面图片地址。
+    /// </summary>
     [property: JsonPropertyName("pic")] public string PicUrl { get; set; } = "";
 
-    // 简介
+    /// <summary>
+    ///     歌单简介。
+    /// </summary>
     [property: JsonPropertyName("intro")] public string Intro { get; set; } = "";
 
-    // 歌曲总数
+    /// <summary>
+    ///     歌曲总数。
+    /// </summary>
     [property: JsonPropertyName("count")] public int SongCount { get; set; }
 
-    // 创建者信息
+    /// <summary>
+    ///     创建者昵称。
+    /// </summary>
     [property: JsonPropertyName("list_create_username")]
     public string CreatorName { get; set; } = "";
 
+    /// <summary>
+    ///     创建者用户 ID。
+    /// </summary>
     [property: JsonPropertyName("list_create_userid")]
     public long CreatorId { get; set; }
 
-    // 播放量 (heat)
+    /// <summary>
+    ///     播放量。
+    /// </summary>
     [property: JsonPropertyName("heat")] public int Heat { get; set; }
 
-    // 创建时间 (时间戳)
+    /// <summary>
+    ///     创建时间戳。
+    /// </summary>
     [property: JsonPropertyName("create_time")]
     public long CreateTime { get; set; }
 }

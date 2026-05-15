@@ -7,17 +7,25 @@ namespace KuGou.Net.Abstractions.Models;
 /// </summary>
 public record PlaylistSongResponse : KgBaseModel
 {
+    /// <summary>
+    ///     歌曲总数。
+    /// </summary>
     [JsonPropertyName("count")] public int Count { get; set; }
 
+    /// <summary>
+    ///     当前页歌曲列表。
+    /// </summary>
     [JsonPropertyName("songs")] public List<PlaylistSong> Songs { get; set; } = new();
 }
 
 /// <summary>
-///     单首歌曲信息 (对应 songs 数组中的项)
+///     单首歌曲信息 
 /// </summary>
 public record PlaylistSong : KgBaseModel
 {
-    // 歌曲名称 (通常是 "歌手 - 歌名" 格式)
+    /// <summary>
+    ///     歌曲名称。
+    /// </summary>
     [property: JsonPropertyName("name")]
     public string Name
     {
@@ -25,32 +33,49 @@ public record PlaylistSong : KgBaseModel
         set;
     }
 
-    // 文件 Hash (最重要)
+    /// <summary>
+    ///     歌曲 Hash。
+    /// </summary>
     [property: JsonPropertyName("hash")] public string Hash { get; set; } = "";
 
-    // 时长 (毫秒)
+    /// <summary>
+    ///     时长，单位为毫秒。
+    /// </summary>
     [property: JsonPropertyName("timelen")]
     public int DurationMs { get; set; }
 
-    // 专辑 ID
+    /// <summary>
+    ///     专辑 ID。
+    /// </summary>
     [property: JsonPropertyName("album_id")]
     public string AlbumId { get; set; } = "";
 
-    // 权限/VIP 标记 (10通常是VIP, 0是免费，8可能是版权限制)
+    /// <summary>
+    ///     权限标记。
+    /// </summary>
     [property: JsonPropertyName("privilege")]
     public int Privilege { get; set; }
 
+    /// <summary>
+    ///     歌单内文件 ID。
+    /// </summary>
     [property: JsonPropertyName("fileid")] public int FileId { get; set; }
 
-    // 歌手信息数组
+    /// <summary>
+    ///     歌手信息列表。
+    /// </summary>
     [property: JsonPropertyName("singerinfo")]
     public List<SingerLite> Singers { get; set; } = new();
 
-    // 专辑信息对象
+    /// <summary>
+    ///     专辑信息。
+    /// </summary>
     [property: JsonPropertyName("albuminfo")]
     public AlbumLite? Album { get; set; }
 
-    //封面，先写死400，酷狗官方存的封面本来就没太高清
+    /// <summary>
+    ///     封面图地址。
+    /// </summary>
     [property: JsonPropertyName("cover")]
     public string? Cover
     {
@@ -78,12 +103,24 @@ public record PlaylistSong : KgBaseModel
     }
 }
 
+/// <summary>
+///     简化歌手信息。
+/// </summary>
 public record SingerLite : KgBaseModel
 {
+    /// <summary>
+    ///     歌手 ID。
+    /// </summary>
     [property: JsonPropertyName("id")] public long Id { get; set; }
 
+    /// <summary>
+    ///     歌手名称。
+    /// </summary>
     [property: JsonPropertyName("name")] public string Name { get; set; } = "";
 
+    /// <summary>
+    ///     歌手头像地址。
+    /// </summary>
     [property: JsonPropertyName("avatar")]
     public string SingerPic
     {
@@ -92,9 +129,18 @@ public record SingerLite : KgBaseModel
     } = "";
 }
 
+/// <summary>
+///     简化专辑信息。
+/// </summary>
 public record AlbumLite : KgBaseModel
 {
+    /// <summary>
+    ///     专辑 ID。
+    /// </summary>
     [property: JsonPropertyName("id")] public long Id { get; set; }
 
+    /// <summary>
+    ///     专辑名称。
+    /// </summary>
     [property: JsonPropertyName("name")] public string Name { get; set; } = "";
 }
