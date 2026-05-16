@@ -1,6 +1,7 @@
 using KuGou.Net.Abstractions.Models;
 using KuGou.Net.Clients;
 using Microsoft.AspNetCore.Mvc;
+using System.ComponentModel.DataAnnotations;
 
 namespace KgWebApi.Net.Controllers;
 
@@ -18,21 +19,21 @@ public class YouthController(UserClient userService) : ControllerBase
     }
 
     [HttpGet("channel/amway")]
-    public async Task<IActionResult> GetChannelAmway([FromQuery(Name = "global_collection_id")] string globalCollectionId)
+    public async Task<IActionResult> GetChannelAmway([FromQuery(Name = "global_collection_id")][Required(AllowEmptyStrings = false)] string globalCollectionId)
     {
         var result = await userService.GetYouthChannelAmwayAsync(globalCollectionId);
         return Ok(result);
     }
 
     [HttpPost("channel/detail")]
-    public async Task<IActionResult> GetChannelDetail([FromQuery(Name = "global_collection_id")] string globalCollectionIds)
+    public async Task<IActionResult> GetChannelDetail([FromQuery(Name = "global_collection_id")][Required(AllowEmptyStrings = false)] string globalCollectionIds)
     {
         var result = await userService.GetYouthChannelDetailAsync(globalCollectionIds);
         return Ok(result);
     }
 
     [HttpPost("channel/similar")]
-    public async Task<IActionResult> GetChannelSimilar([FromQuery(Name = "channel_id")] string channelId)
+    public async Task<IActionResult> GetChannelSimilar([FromQuery(Name = "channel_id")][Required(AllowEmptyStrings = false)] string channelId)
     {
         var result = await userService.GetYouthChannelSimilarAsync(channelId);
         return Ok(result);
@@ -40,7 +41,7 @@ public class YouthController(UserClient userService) : ControllerBase
 
     [HttpGet("channel/song")]
     public async Task<IActionResult> GetChannelSong(
-        [FromQuery(Name = "global_collection_id")] string globalCollectionId,
+        [FromQuery(Name = "global_collection_id")][Required(AllowEmptyStrings = false)] string globalCollectionId,
         [FromQuery] int page = 1,
         [FromQuery] int pagesize = 30)
     {
@@ -50,8 +51,8 @@ public class YouthController(UserClient userService) : ControllerBase
 
     [HttpGet("channel/song/detail")]
     public async Task<IActionResult> GetChannelSongDetail(
-        [FromQuery(Name = "global_collection_id")] string globalCollectionId,
-        [FromQuery] string fileid)
+        [FromQuery(Name = "global_collection_id")][Required(AllowEmptyStrings = false)] string globalCollectionId,
+        [FromQuery][Required(AllowEmptyStrings = false)] string fileid)
     {
         var result = await userService.GetYouthChannelSongDetailAsync(globalCollectionId, fileid);
         return Ok(result);
@@ -59,7 +60,7 @@ public class YouthController(UserClient userService) : ControllerBase
 
     [HttpPost("channel/sub")]
     public async Task<IActionResult> SetChannelSubscription(
-        [FromQuery(Name = "global_collection_id")] string globalCollectionId,
+        [FromQuery(Name = "global_collection_id")][Required(AllowEmptyStrings = false)] string globalCollectionId,
         [FromQuery] int t = 1)
     {
         var result = await userService.SetYouthChannelSubscriptionAsync(globalCollectionId, t != 0);
@@ -96,7 +97,7 @@ public class YouthController(UserClient userService) : ControllerBase
 
     [HttpGet("user/song")]
     public async Task<IActionResult> GetUserSong(
-        [FromQuery] string? userid = null,
+        [FromQuery][Required(AllowEmptyStrings = false)] string userid,
         [FromQuery] int page = 1,
         [FromQuery] int pagesize = 30,
         [FromQuery] int type = 0)

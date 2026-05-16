@@ -1,6 +1,7 @@
 using KuGou.Net.Abstractions.Models;
 using KuGou.Net.Clients;
 using Microsoft.AspNetCore.Mvc;
+using System.ComponentModel.DataAnnotations;
 
 namespace KgWebApi.Net.Controllers;
 
@@ -16,7 +17,7 @@ public class PlayListController(PlaylistClient playlistClient) : ControllerBase
 
     [HttpGet("/sheet/collection/detail")]
     public async Task<IActionResult> GetSheetCollectionDetail(
-        [FromQuery(Name = "collection_id")] string collectionId,
+        [FromQuery(Name = "collection_id")][Required(AllowEmptyStrings = false)] string collectionId,
         [FromQuery] int page = 1)
     {
         return Ok(await playlistClient.GetSheetCollectionDetailAsync(collectionId, page));
@@ -24,8 +25,8 @@ public class PlayListController(PlaylistClient playlistClient) : ControllerBase
 
     [HttpGet("/sheet/detail")]
     public async Task<IActionResult> GetSheetDetail(
-        [FromQuery] string id,
-        [FromQuery] string source)
+        [FromQuery][Required(AllowEmptyStrings = false)] string id,
+        [FromQuery][Required(AllowEmptyStrings = false)] string source)
     {
         return Ok(await playlistClient.GetSheetDetailAsync(id, source));
     }
@@ -38,7 +39,7 @@ public class PlayListController(PlaylistClient playlistClient) : ControllerBase
 
     [HttpGet("/sheet/list")]
     public async Task<IActionResult> GetSheetList(
-        [FromQuery(Name = "album_audio_id")] string albumAudioId,
+        [FromQuery(Name = "album_audio_id")][Required(AllowEmptyStrings = false)] string albumAudioId,
         [FromQuery(Name = "opern_type")] int opernType = 0,
         [FromQuery] int page = 1,
         [FromQuery] int pagesize = 30)
@@ -53,7 +54,7 @@ public class PlayListController(PlaylistClient playlistClient) : ControllerBase
     /// <returns>歌单详情。</returns>
     [HttpGet("detail")]
     [ProducesResponseType(typeof(PlaylistInfo), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetDetail([FromQuery(Name = "ids")] string ids)
+    public async Task<IActionResult> GetDetail([FromQuery(Name = "ids")][Required(AllowEmptyStrings = false)] string ids)
     {
         var result = await playlistClient.GetInfoAsync(ids);
         return Ok(result);
@@ -84,7 +85,7 @@ public class PlayListController(PlaylistClient playlistClient) : ControllerBase
     [HttpGet("track/all")]
     [ProducesResponseType(typeof(PlaylistSongResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetDtrackAll(
-        [FromQuery] string id,
+        [FromQuery][Required(AllowEmptyStrings = false)] string id,
         [FromQuery] int page = 1,
         [FromQuery] int pagesize = 30)
     {
@@ -94,7 +95,7 @@ public class PlayListController(PlaylistClient playlistClient) : ControllerBase
 
     [HttpGet("track/all/new")]
     public async Task<IActionResult> GetTrackAllNew(
-        [FromQuery] string listid,
+        [FromQuery][Required(AllowEmptyStrings = false)] string listid,
         [FromQuery] int page = 1,
         [FromQuery] int pagesize = 30)
     {
@@ -103,7 +104,7 @@ public class PlayListController(PlaylistClient playlistClient) : ControllerBase
     }
 
     [HttpGet("similar")]
-    public async Task<IActionResult> GetSimilar([FromQuery] string ids)
+    public async Task<IActionResult> GetSimilar([FromQuery][Required(AllowEmptyStrings = false)] string ids)
     {
         var result = await playlistClient.GetSimilarRawAsync(ids);
         return Ok(result);
@@ -119,12 +120,12 @@ public class PlayListController(PlaylistClient playlistClient) : ControllerBase
     /// <summary>
     ///     收藏歌单
     /// <param name="name">歌单名称。</param>
-    /// <param name="list_create_gid">歌单 ID。</param>
+    /// <param name="sourceGlobalId">歌单 ID。</param>
     /// </summary>
     [HttpPost("add")]
     public async Task<IActionResult> AddPlaylist(
-        [FromQuery] string name,
-        [FromQuery(Name = "list_create_gid")] string sourceGlobalId)
+        [FromQuery][Required(AllowEmptyStrings = false)] string name,
+        [FromQuery(Name = "list_create_gid")][Required(AllowEmptyStrings = false)] string sourceGlobalId)
     {
         var result = await playlistClient.CollectPlaylistAsync(name, sourceGlobalId);
         return Ok(result);
@@ -137,7 +138,7 @@ public class PlayListController(PlaylistClient playlistClient) : ControllerBase
     /// </summary>
     [HttpPost("create")]
     public async Task<IActionResult> CreatePlaylist(
-        [FromQuery] string name,
+        [FromQuery][Required(AllowEmptyStrings = false)] string name,
         [FromQuery(Name = "type")] long type = 0)
     {
         var result = await playlistClient.CreatePlaylistAsync(name, type);
@@ -148,7 +149,7 @@ public class PlayListController(PlaylistClient playlistClient) : ControllerBase
     ///     取消收藏 / 删除歌单
     /// </summary>
     [HttpPost("del")]
-    public async Task<IActionResult> DeletePlaylist([FromQuery] string listid)
+    public async Task<IActionResult> DeletePlaylist([FromQuery][Required(AllowEmptyStrings = false)] string listid)
     {
         var result = await playlistClient.DeletePlaylistAsync(listid);
         return Ok(result);
@@ -189,7 +190,9 @@ public class PlayListController(PlaylistClient playlistClient) : ControllerBase
     /// <returns>删除歌曲结果。</returns>
     [HttpPost("tracks/del")]
     [ProducesResponseType(typeof(RemoveSongResponse), StatusCodes.Status200OK)]
-    public async Task<IActionResult> DeleteTracks([FromQuery] string listid, [FromQuery] string fileids)
+    public async Task<IActionResult> DeleteTracks(
+        [FromQuery][Required(AllowEmptyStrings = false)] string listid,
+        [FromQuery][Required(AllowEmptyStrings = false)] string fileids)
     {
         if (string.IsNullOrEmpty(fileids)) return BadRequest("fileids cannot be empty");
 

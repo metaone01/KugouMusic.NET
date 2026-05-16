@@ -1,6 +1,7 @@
 using KuGou.Net.Abstractions.Models;
 using KuGou.Net.Clients;
 using Microsoft.AspNetCore.Mvc;
+using System.ComponentModel.DataAnnotations;
 
 namespace KgWebApi.Net.Controllers;
 
@@ -15,14 +16,14 @@ public class AlbumController(AlbumClient albumClient) : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetAlbum([FromQuery(Name = "album_id")] string albumId,
+    public async Task<IActionResult> GetAlbum([FromQuery(Name = "album_id")][Required(AllowEmptyStrings = false)] string albumId,
         [FromQuery] string? fields = null)
     {
         return Ok(await albumClient.GetAlbumRawAsync(albumId, fields));
     }
 
     [HttpGet("detail")]
-    public async Task<IActionResult> GetDetail([FromQuery(Name = "id")] string id)
+    public async Task<IActionResult> GetDetail([FromQuery(Name = "id")][Required(AllowEmptyStrings = false)] string id)
     {
         return Ok(await albumClient.GetDetailRawAsync(id));
     }
@@ -37,7 +38,7 @@ public class AlbumController(AlbumClient albumClient) : ControllerBase
     [HttpGet("songs")]
     [ProducesResponseType(typeof(List<AlbumSongItem>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetSongs(
-        [FromQuery(Name = "id")] string id,
+        [FromQuery(Name = "id")][Required(AllowEmptyStrings = false)] string id,
         [FromQuery] int page = 1,
         [FromQuery] int pagesize = 30)
     {

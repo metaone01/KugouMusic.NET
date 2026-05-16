@@ -1,5 +1,6 @@
 using KuGou.Net.Clients;
 using Microsoft.AspNetCore.Mvc;
+using System.ComponentModel.DataAnnotations;
 
 namespace KgWebApi.Net.Controllers;
 
@@ -15,7 +16,7 @@ public class FmController(FmClient fmClient) : ControllerBase
 
     [HttpGet("songs")]
     public async Task<IActionResult> GetSongs(
-        [FromQuery] string fmid,
+        [FromQuery][Required(AllowEmptyStrings = false)] string fmid,
         [FromQuery] int type = 2,
         [FromQuery] int offset = -1,
         [FromQuery] int size = 20)
@@ -30,7 +31,7 @@ public class FmController(FmClient fmClient) : ControllerBase
     }
 
     [HttpGet("image")]
-    public async Task<IActionResult> GetImages([FromQuery] string fmid)
+    public async Task<IActionResult> GetImages([FromQuery][Required(AllowEmptyStrings = false)] string fmid)
     {
         return Ok(await fmClient.GetImagesAsync(fmid));
     }

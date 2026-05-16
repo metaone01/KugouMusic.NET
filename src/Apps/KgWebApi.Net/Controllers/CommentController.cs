@@ -1,5 +1,6 @@
 using KuGou.Net.Clients;
 using Microsoft.AspNetCore.Mvc;
+using System.ComponentModel.DataAnnotations;
 
 namespace KgWebApi.Net.Controllers;
 
@@ -9,7 +10,7 @@ public class CommentController(CommentClient commentClient) : ControllerBase
 {
     [HttpGet("music")]
     public async Task<IActionResult> GetMusicComments(
-        [FromQuery] string mixsongid,
+        [FromQuery][Required(AllowEmptyStrings = false)] string mixsongid,
         [FromQuery] int page = 1,
         [FromQuery] int pagesize = 30)
     {
@@ -18,7 +19,7 @@ public class CommentController(CommentClient commentClient) : ControllerBase
 
     [HttpGet("playlist")]
     public async Task<IActionResult> GetPlaylistComments(
-        [FromQuery] string id,
+        [FromQuery][Required(AllowEmptyStrings = false)] string id,
         [FromQuery] int page = 1,
         [FromQuery] int pagesize = 30)
     {
@@ -27,7 +28,7 @@ public class CommentController(CommentClient commentClient) : ControllerBase
 
     [HttpGet("album")]
     public async Task<IActionResult> GetAlbumComments(
-        [FromQuery] string id,
+        [FromQuery][Required(AllowEmptyStrings = false)] string id,
         [FromQuery] int page = 1,
         [FromQuery] int pagesize = 30)
     {
@@ -36,17 +37,17 @@ public class CommentController(CommentClient commentClient) : ControllerBase
 
     [HttpGet("count")]
     public async Task<IActionResult> GetCommentCount(
-        [FromQuery] string? hash = null,
-        [FromQuery(Name = "special_id")] string? specialId = null)
+        [FromQuery][Required(AllowEmptyStrings = false)] string hash,
+        [FromQuery(Name = "special_id")][Required(AllowEmptyStrings = false)] string specialId)
     {
         return Ok(await commentClient.GetCommentCountAsync(hash, specialId));
     }
 
     [HttpGet("floor")]
     public async Task<IActionResult> GetFloorComments(
-        [FromQuery(Name = "special_id")] string? specialId,
-        [FromQuery] string tid,
-        [FromQuery] string? mixsongid = null,
+        [FromQuery(Name = "special_id")][Required(AllowEmptyStrings = false)] string specialId,
+        [FromQuery][Required(AllowEmptyStrings = false)] string tid,
+        [FromQuery][Required(AllowEmptyStrings = false)] string mixsongid,
         [FromQuery(Name = "resource_type")] string resourceType = "song",
         [FromQuery] int page = 1,
         [FromQuery] int pagesize = 30,
@@ -68,8 +69,8 @@ public class CommentController(CommentClient commentClient) : ControllerBase
 
     [HttpGet("music/classify")]
     public async Task<IActionResult> GetMusicCommentClassify(
-        [FromQuery] string mixsongid,
-        [FromQuery(Name = "type_id")] string typeId,
+        [FromQuery][Required(AllowEmptyStrings = false)] string mixsongid,
+        [FromQuery(Name = "type_id")][Required(AllowEmptyStrings = false)] string typeId,
         [FromQuery] int page = 1,
         [FromQuery] int pagesize = 30,
         [FromQuery] int sort = 1)
@@ -79,8 +80,8 @@ public class CommentController(CommentClient commentClient) : ControllerBase
 
     [HttpGet("music/hotword")]
     public async Task<IActionResult> GetMusicCommentHotword(
-        [FromQuery] string mixsongid,
-        [FromQuery(Name = "hot_word")] string hotWord,
+        [FromQuery][Required(AllowEmptyStrings = false)] string mixsongid,
+        [FromQuery(Name = "hot_word")][Required(AllowEmptyStrings = false)] string hotWord,
         [FromQuery] int page = 1,
         [FromQuery] int pagesize = 30)
     {

@@ -1,5 +1,7 @@
 using KuGou.Net.Clients;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
+using System.ComponentModel.DataAnnotations;
 
 namespace KgWebApi.Net.Controllers;
 
@@ -12,26 +14,26 @@ public class MediaCatalogController(
     ThemeClient themeClient) : ControllerBase
 {
     [HttpGet("video/detail")]
-    public async Task<IActionResult> GetVideoDetail([FromQuery] string id)
+    public async Task<IActionResult> GetVideoDetail([FromQuery][Required(AllowEmptyStrings = false)] string id)
     {
         return Ok(await videoClient.GetDetailAsync(id));
     }
 
     [HttpGet("video/url")]
-    public async Task<IActionResult> GetVideoUrl([FromQuery] string hash)
+    public async Task<IActionResult> GetVideoUrl([FromQuery][Required(AllowEmptyStrings = false)] string hash)
     {
         return Ok(await videoClient.GetUrlAsync(hash));
     }
 
     [HttpGet("longaudio/album/detail")]
-    public async Task<IActionResult> GetLongAudioAlbumDetail([FromQuery(Name = "album_id")] string albumId)
+    public async Task<IActionResult> GetLongAudioAlbumDetail([FromQuery(Name = "album_id")][Required(AllowEmptyStrings = false)] string albumId)
     {
         return Ok(await longAudioClient.GetAlbumDetailAsync(albumId));
     }
 
     [HttpGet("longaudio/album/audios")]
     public async Task<IActionResult> GetLongAudioAlbumAudios(
-        [FromQuery(Name = "album_id")] string albumId,
+        [FromQuery(Name = "album_id")][Required(AllowEmptyStrings = false)] string albumId,
         [FromQuery] int page = 1,
         [FromQuery] int pagesize = 30)
     {
@@ -65,7 +67,7 @@ public class MediaCatalogController(
 
     [HttpGet("ip")]
     public async Task<IActionResult> GetIpResources(
-        [FromQuery] string id,
+        [FromQuery][Required(AllowEmptyStrings = false)] string id,
         [FromQuery] string type = "audios",
         [FromQuery] int page = 1,
         [FromQuery] int pagesize = 30)
@@ -74,14 +76,14 @@ public class MediaCatalogController(
     }
 
     [HttpGet("ip/detail")]
-    public async Task<IActionResult> GetIpDetail([FromQuery] string id)
+    public async Task<IActionResult> GetIpDetail([FromQuery][Required(AllowEmptyStrings = false)] string id)
     {
         return Ok(await ipClient.GetDetailAsync(id));
     }
 
     [HttpGet("ip/playlist")]
     public async Task<IActionResult> GetIpPlaylists(
-        [FromQuery] string id,
+        [FromQuery][Required(AllowEmptyStrings = false)] string id,
         [FromQuery] int page = 1,
         [FromQuery] int pagesize = 30)
     {
@@ -95,7 +97,7 @@ public class MediaCatalogController(
     }
 
     [HttpGet("ip/zone/home")]
-    public async Task<IActionResult> GetIpZoneHome([FromQuery] string id)
+    public async Task<IActionResult> GetIpZoneHome([FromQuery][Required(AllowEmptyStrings = false)] string id)
     {
         return Ok(await ipClient.GetZoneHomeAsync(id));
     }
@@ -108,9 +110,9 @@ public class MediaCatalogController(
 
     [HttpGet("scene/audio/list")]
     public async Task<IActionResult> GetSceneAudios(
-        [FromQuery] string id,
-        [FromQuery(Name = "module_id")] string? moduleId = null,
-        [FromQuery] string? tag = null,
+        [FromQuery][Required(AllowEmptyStrings = false)] string id,
+        [FromQuery(Name = "module_id")][Required(AllowEmptyStrings = false)] string moduleId,
+        [FromQuery][Required(AllowEmptyStrings = false)] string tag,
         [FromQuery] int page = 1,
         [FromQuery] int pagesize = 30)
     {
@@ -119,7 +121,7 @@ public class MediaCatalogController(
 
     [HttpGet("scene/collection/list")]
     public async Task<IActionResult> GetSceneCollections(
-        [FromQuery(Name = "tag_id")] string tagId,
+        [FromQuery(Name = "tag_id")][Required(AllowEmptyStrings = false)] string tagId,
         [FromQuery] int page = 1,
         [FromQuery] int pagesize = 30)
     {
@@ -128,7 +130,7 @@ public class MediaCatalogController(
 
     [HttpGet("scene/lists/v2")]
     public async Task<IActionResult> GetSceneListsV2(
-        [FromQuery] string id,
+        [FromQuery][Required(AllowEmptyStrings = false)] string id,
         [FromQuery] int page = 1,
         [FromQuery] int pagesize = 30,
         [FromQuery] string sort = "rec")
@@ -137,15 +139,15 @@ public class MediaCatalogController(
     }
 
     [HttpGet("scene/module")]
-    public async Task<IActionResult> GetSceneModules([FromQuery] string id)
+    public async Task<IActionResult> GetSceneModules([FromQuery][Required(AllowEmptyStrings = false)] string id)
     {
         return Ok(await sceneClient.GetModulesAsync(id));
     }
 
     [HttpGet("scene/module/info")]
     public async Task<IActionResult> GetSceneModuleInfo(
-        [FromQuery] string id,
-        [FromQuery(Name = "module_id")] string moduleId)
+        [FromQuery][Required(AllowEmptyStrings = false)] string id,
+        [FromQuery(Name = "module_id")][Required(AllowEmptyStrings = false)] string moduleId)
     {
         return Ok(await sceneClient.GetModuleInfoAsync(id, moduleId));
     }
@@ -161,7 +163,7 @@ public class MediaCatalogController(
 
     [HttpGet("scene/video/list")]
     public async Task<IActionResult> GetSceneVideos(
-        [FromQuery(Name = "tag_id")] string tagId,
+        [FromQuery(Name = "tag_id")][Required(AllowEmptyStrings = false)] string tagId,
         [FromQuery] int page = 1,
         [FromQuery] int pagesize = 30)
     {
@@ -169,7 +171,7 @@ public class MediaCatalogController(
     }
 
     [HttpGet("theme/music")]
-    public async Task<IActionResult> GetThemeMusic([FromQuery] string ids)
+    public async Task<IActionResult> GetThemeMusic([FromQuery][Required(AllowEmptyStrings = false)] string ids)
     {
         return Ok(await themeClient.GetMusicAsync(ids));
     }
@@ -181,13 +183,13 @@ public class MediaCatalogController(
     }
 
     [HttpGet("theme/music/detail")]
-    public async Task<IActionResult> GetThemeMusicDetail([FromQuery] string id)
+    public async Task<IActionResult> GetThemeMusicDetail([FromQuery][Required(AllowEmptyStrings = false)] string id)
     {
         return Ok(await themeClient.GetMusicDetailAsync(id));
     }
 
     [HttpGet("theme/playlist/track")]
-    public async Task<IActionResult> GetThemePlaylistTracks([FromQuery(Name = "theme_id")] string themeId)
+    public async Task<IActionResult> GetThemePlaylistTracks([FromQuery(Name = "theme_id")][Required(AllowEmptyStrings = false)] string themeId)
     {
         return Ok(await themeClient.GetPlaylistTracksAsync(themeId));
     }

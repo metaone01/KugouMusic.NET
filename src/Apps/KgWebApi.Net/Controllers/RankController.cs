@@ -1,6 +1,7 @@
 using KuGou.Net.Abstractions.Models;
 using KuGou.Net.Clients;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 
 namespace KgWebApi.Net.Controllers;
 
@@ -23,7 +24,7 @@ public class RankController(RankClient rankClient) : ControllerBase
 
     [HttpGet("info")]
     public async Task<IActionResult> GetRankInfo(
-        [FromQuery] int rankid,
+        [FromQuery][BindRequired] int rankid,
         [FromQuery(Name = "rank_cid")] int? rankCid = null,
         [FromQuery(Name = "album_img")] int albumImg = 1,
         [FromQuery] string? zone = null)
@@ -42,7 +43,7 @@ public class RankController(RankClient rankClient) : ControllerBase
     [HttpGet("audio")]
     [ProducesResponseType(typeof(RankSongResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetRankSongs(
-        [FromQuery] int rankid,
+        [FromQuery][BindRequired] int rankid,
         [FromQuery] int page = 1,
         [FromQuery] int pagesize = 30)
     {

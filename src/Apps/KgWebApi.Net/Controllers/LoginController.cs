@@ -1,6 +1,7 @@
 using KuGou.Net.Abstractions.Models;
 using KuGou.Net.Clients;
 using Microsoft.AspNetCore.Mvc;
+using System.ComponentModel.DataAnnotations;
 
 namespace KgWebApi.Net.Controllers;
 
@@ -55,7 +56,7 @@ public class LoginController(LoginClient loginClient, ILogger<LoginController> l
     /// <returns>二维码登录状态。</returns>
     [HttpGet("qr/check")]
     [ProducesResponseType(typeof(QrLoginStatusResponse), StatusCodes.Status200OK)]
-    public async Task<IActionResult> CheckQrCode([FromQuery] string key)
+    public async Task<IActionResult> CheckQrCode([FromQuery][Required(AllowEmptyStrings = false)] string key)
     {
         if (string.IsNullOrWhiteSpace(key)) return BadRequest(new { status = 0, msg = "Key 不能为空" });
 
@@ -88,4 +89,6 @@ public class LoginController(LoginClient loginClient, ILogger<LoginController> l
 
 // ================= DTO 模型 =================
 
-public record MobileLoginRequest(string Mobile, string Code);
+public record MobileLoginRequest(
+    [property: Required(AllowEmptyStrings = false)] string Mobile,
+    [property: Required(AllowEmptyStrings = false)] string Code);

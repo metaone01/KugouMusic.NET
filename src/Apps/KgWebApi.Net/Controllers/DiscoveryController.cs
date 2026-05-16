@@ -1,6 +1,7 @@
 using KuGou.Net.Abstractions.Models;
 using KuGou.Net.Clients;
 using Microsoft.AspNetCore.Mvc;
+using System.ComponentModel.DataAnnotations;
 
 namespace KgWebApi.Net.Controllers;
 
@@ -59,7 +60,7 @@ public class DiscoveryController(RecommendClient recommendClient) : ControllerBa
     }*/
 
     [HttpGet("ai/recommend")]
-    public async Task<IActionResult> GetAiRecommend([FromQuery(Name = "album_audio_id")] string? albumAudioIds = null)
+    public async Task<IActionResult> GetAiRecommend([FromQuery(Name = "album_audio_id")][Required(AllowEmptyStrings = false)] string albumAudioIds)
     {
         var res = await recommendClient.GetAiRecommendAsync(albumAudioIds);
         return Ok(res);

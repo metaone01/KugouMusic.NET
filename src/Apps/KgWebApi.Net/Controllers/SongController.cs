@@ -1,6 +1,8 @@
 using KuGou.Net.Abstractions.Models;
 using KuGou.Net.Clients;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
+using System.ComponentModel.DataAnnotations;
 
 namespace KgWebApi.Net.Controllers;
 
@@ -9,14 +11,14 @@ namespace KgWebApi.Net.Controllers;
 public class SongController(SongClient songClient) : ControllerBase
 {
     [HttpGet("/audio")]
-    public async Task<IActionResult> GetAudio([FromQuery] string hash)
+    public async Task<IActionResult> GetAudio([FromQuery][Required(AllowEmptyStrings = false)] string hash)
     {
         return Ok(await songClient.GetAudioAsync(hash));
     }
 
     [HttpGet("/audio/related")]
     public async Task<IActionResult> GetAudioRelated(
-        [FromQuery(Name = "album_audio_id")] long albumAudioId,
+        [FromQuery(Name = "album_audio_id")][BindRequired] long albumAudioId,
         [FromQuery] int page = 1,
         [FromQuery] int pagesize = 30,
         [FromQuery] string sort = "all",
@@ -36,37 +38,37 @@ public class SongController(SongClient songClient) : ControllerBase
 
     [HttpGet("/audio/accompany/matching")]
     public async Task<IActionResult> GetAudioAccompanyMatching(
-        [FromQuery] string hash,
-        [FromQuery] long mixId = 0,
-        [FromQuery] string? fileName = null)
+        [FromQuery][Required(AllowEmptyStrings = false)] string hash,
+        [FromQuery][Required(AllowEmptyStrings = false)] string fileName,
+        [FromQuery][Required] long? mixId)
     {
-        return Ok(await songClient.GetAudioAccompanyMatchingAsync(hash, mixId, fileName));
+        return Ok(await songClient.GetAudioAccompanyMatchingAsync(hash, mixId!.Value, fileName));
     }
 
     [HttpGet("/audio/ktv/total")]
     public async Task<IActionResult> GetAudioKtvTotal(
-        [FromQuery] long songId,
-        [FromQuery] string songHash,
-        [FromQuery] string singerName)
+        [FromQuery][BindRequired] long songId,
+        [FromQuery][Required(AllowEmptyStrings = false)] string songHash,
+        [FromQuery][Required(AllowEmptyStrings = false)] string singerName)
     {
         return Ok(await songClient.GetAudioKtvTotalAsync(songId, songHash, singerName));
     }
 
     [HttpGet("climax")]
-    public async Task<IActionResult> GetClimax([FromQuery] string hash)
+    public async Task<IActionResult> GetClimax([FromQuery][Required(AllowEmptyStrings = false)] string hash)
     {
         return Ok(await songClient.GetSongClimaxAsync(hash));
     }
 
     [HttpGet("ranking")]
-    public async Task<IActionResult> GetRanking([FromQuery(Name = "album_audio_id")] string albumAudioId)
+    public async Task<IActionResult> GetRanking([FromQuery(Name = "album_audio_id")][Required(AllowEmptyStrings = false)] string albumAudioId)
     {
         return Ok(await songClient.GetSongRankingAsync(albumAudioId));
     }
 
     [HttpGet("ranking/filter")]
     public async Task<IActionResult> GetRankingFilter(
-        [FromQuery(Name = "album_audio_id")] string albumAudioId,
+        [FromQuery(Name = "album_audio_id")][Required(AllowEmptyStrings = false)] string albumAudioId,
         [FromQuery] int page = 1,
         [FromQuery] int pagesize = 30)
     {
@@ -75,7 +77,7 @@ public class SongController(SongClient songClient) : ControllerBase
 
     [HttpGet("/kmr/audio/mv")]
     public async Task<IActionResult> GetKmrAudioMv(
-        [FromQuery(Name = "album_audio_id")] string albumAudioIds,
+        [FromQuery(Name = "album_audio_id")][Required(AllowEmptyStrings = false)] string albumAudioIds,
         [FromQuery] string? fields = null)
     {
         return Ok(await songClient.GetKmrAudioMvAsync(albumAudioIds, fields));
@@ -83,7 +85,7 @@ public class SongController(SongClient songClient) : ControllerBase
 
     [HttpGet("/kmr/audio")]
     public async Task<IActionResult> GetKmrAudio(
-        [FromQuery(Name = "album_audio_id")] string albumAudioIds,
+        [FromQuery(Name = "album_audio_id")][Required(AllowEmptyStrings = false)] string albumAudioIds,
         [FromQuery] string? fields = "base")
     {
         return Ok(await songClient.GetKmrAudioAsync(albumAudioIds, fields));
@@ -91,7 +93,7 @@ public class SongController(SongClient songClient) : ControllerBase
 
     [HttpGet("/privilege/lite")]
     public async Task<IActionResult> GetPrivilegeLite(
-        [FromQuery] string hash,
+        [FromQuery][Required(AllowEmptyStrings = false)] string hash,
         [FromQuery(Name = "album_id")] string? albumIds = null)
     {
         return Ok(await songClient.GetPrivilegeLiteAsync(hash, albumIds));
@@ -99,7 +101,7 @@ public class SongController(SongClient songClient) : ControllerBase
 
     [HttpGet("/images")]
     public async Task<IActionResult> GetImages(
-        [FromQuery] string hash,
+        [FromQuery][Required(AllowEmptyStrings = false)] string hash,
         [FromQuery(Name = "album_id")] string? albumIds = null,
         [FromQuery(Name = "album_audio_id")] string? albumAudioIds = null,
         [FromQuery] int count = 5)
@@ -119,7 +121,7 @@ public class SongController(SongClient songClient) : ControllerBase
     [HttpGet("/images/audio")]
     [ProducesResponseType(typeof(AudioImageResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAudioImages(
-        [FromQuery] string hash,
+        [FromQuery][Required(AllowEmptyStrings = false)] string hash,
         [FromQuery(Name = "audio_id")] string? audioIds = null,
         [FromQuery(Name = "album_audio_id")] string? albumAudioIds = null,
         [FromQuery(Name = "filename")] string? fileNames = null,
@@ -130,7 +132,7 @@ public class SongController(SongClient songClient) : ControllerBase
 
     [HttpGet("url/new")]
     public async Task<IActionResult> GetUrlNew(
-        [FromQuery] string hash,
+        [FromQuery][Required(AllowEmptyStrings = false)] string hash,
         [FromQuery(Name = "album_audio_id")] string? albumAudioId = null,
         [FromQuery(Name = "free_part")] bool freePart = false)
     {
@@ -149,7 +151,7 @@ public class SongController(SongClient songClient) : ControllerBase
     [HttpGet("url")]
     [ProducesResponseType(typeof(PlayUrlData), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetUrl(
-        [FromQuery] string hash,
+        [FromQuery][Required(AllowEmptyStrings = false)] string hash,
         [FromQuery] string quality = "128",
         [FromQuery(Name = "album_id")] string? albumId = null,
         [FromQuery(Name = "album_audio_id")] string? albumAudioId = null,

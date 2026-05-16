@@ -1,6 +1,7 @@
 using KuGou.Net.Abstractions.Models;
 using KuGou.Net.Clients;
 using Microsoft.AspNetCore.Mvc;
+using System.ComponentModel.DataAnnotations;
 
 namespace KgWebApi.Net.Controllers;
 
@@ -80,7 +81,7 @@ public class UserController(UserClient userClient) : ControllerBase
 
     [HttpGet("cloud/url")]
     public async Task<IActionResult> UserCloudUrl(
-        [FromQuery] string hash,
+        [FromQuery][Required(AllowEmptyStrings = false)] string hash,
         [FromQuery(Name = "album_audio_id")] string? albumAudioId = null,
         [FromQuery(Name = "audio_id")] string? audioId = null,
         [FromQuery] string? name = null)
@@ -91,7 +92,7 @@ public class UserController(UserClient userClient) : ControllerBase
 
     [HttpGet("follow/message")]
     public async Task<IActionResult> UserFollowMessage(
-        [FromQuery(Name = "id")] string artistId,
+        [FromQuery(Name = "id")][Required(AllowEmptyStrings = false)] string artistId,
         [FromQuery] int pagesize = 30)
     {
         var result = await userClient.GetFollowMessagesAsync(artistId, pagesize);
@@ -115,7 +116,7 @@ public class UserController(UserClient userClient) : ControllerBase
     }
 
     [HttpGet("/favorite/count")]
-    public async Task<IActionResult> FavoriteCount([FromQuery] string mixsongids)
+    public async Task<IActionResult> FavoriteCount([FromQuery][Required(AllowEmptyStrings = false)] string mixsongids)
     {
         var result = await userClient.GetFavoriteCountAsync(mixsongids);
         return Ok(result);

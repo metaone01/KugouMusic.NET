@@ -1,6 +1,7 @@
 using KuGou.Net.Abstractions.Models;
 using KuGou.Net.Clients;
 using Microsoft.AspNetCore.Mvc;
+using System.ComponentModel.DataAnnotations;
 
 namespace KgWebApi.Net.Controllers;
 
@@ -9,13 +10,13 @@ namespace KgWebApi.Net.Controllers;
 public class ArtistController(ArtistClient artistClient) : ControllerBase
 {
     [HttpPost("follow")]
-    public async Task<IActionResult> Follow([FromQuery] string id)
+    public async Task<IActionResult> Follow([FromQuery][Required(AllowEmptyStrings = false)] string id)
     {
         return Ok(await artistClient.FollowAsync(id));
     }
 
     [HttpPost("unfollow")]
-    public async Task<IActionResult> Unfollow([FromQuery] string id)
+    public async Task<IActionResult> Unfollow([FromQuery][Required(AllowEmptyStrings = false)] string id)
     {
         return Ok(await artistClient.UnfollowAsync(id));
     }
@@ -59,7 +60,7 @@ public class ArtistController(ArtistClient artistClient) : ControllerBase
 
     [HttpGet("videos")]
     public async Task<IActionResult> GetVideos(
-        [FromQuery] string id,
+        [FromQuery][Required(AllowEmptyStrings = false)] string id,
         [FromQuery] int page = 1,
         [FromQuery] int pagesize = 30,
         [FromQuery] string tag = "all")
@@ -74,7 +75,7 @@ public class ArtistController(ArtistClient artistClient) : ControllerBase
     /// <returns>歌手详情。</returns>
     [HttpGet("detail")]
     [ProducesResponseType(typeof(SingerDetailResponse), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetDetail([FromQuery] string id)
+    public async Task<IActionResult> GetDetail([FromQuery][Required(AllowEmptyStrings = false)] string id)
     {
         return Ok(await artistClient.GetDetailAsync(id));
     }
@@ -90,7 +91,7 @@ public class ArtistController(ArtistClient artistClient) : ControllerBase
     [HttpGet("audios")]
     [ProducesResponseType(typeof(SingerAudioResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAudios(
-        [FromQuery] string id,
+        [FromQuery][Required(AllowEmptyStrings = false)] string id,
         [FromQuery] int page = 1,
         [FromQuery] int pagesize = 30,
         [FromQuery] string sort = "new")
@@ -100,7 +101,7 @@ public class ArtistController(ArtistClient artistClient) : ControllerBase
 
     [HttpGet("albums")]
     public async Task<IActionResult> GetAlbums(
-        [FromQuery] string id,
+        [FromQuery][Required(AllowEmptyStrings = false)] string id,
         [FromQuery] int page = 1,
         [FromQuery] int pagesize = 30,
         [FromQuery] string sort = "new")

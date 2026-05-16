@@ -1,6 +1,7 @@
 using KuGou.Net.Abstractions.Models;
 using KuGou.Net.Clients;
 using Microsoft.AspNetCore.Mvc;
+using System.ComponentModel.DataAnnotations;
 
 namespace KgWebApi.Net.Controllers;
 
@@ -19,7 +20,7 @@ public class SearchController(
     /// </summary>
     [HttpGet]
     public async Task<IActionResult> Search(
-        [FromQuery] string keywords = "",
+        [FromQuery][Required(AllowEmptyStrings = false)] string keywords = "",
         [FromQuery] int page = 1,
         [FromQuery] int pagesize = 30,
         [FromQuery] string type = "song")
@@ -61,7 +62,7 @@ public class SearchController(
     [HttpGet("special")]
     [ProducesResponseType(typeof(List<SearchPlaylistItem>), StatusCodes.Status200OK)]
     public async Task<IActionResult> SearchSpecial(
-        [FromQuery] string keywords = "",
+        [FromQuery][Required(AllowEmptyStrings = false)] string keywords = "",
         [FromQuery] int page = 1)
     {
         try
@@ -95,7 +96,7 @@ public class SearchController(
     [HttpGet("album")]
     [ProducesResponseType(typeof(List<SearchAlbumItem>), StatusCodes.Status200OK)]
     public async Task<IActionResult> SearchAlbum(
-        [FromQuery] string keywords = "",
+        [FromQuery][Required(AllowEmptyStrings = false)] string keywords = "",
         [FromQuery] int page = 1)
     {
         try
@@ -141,7 +142,7 @@ public class SearchController(
 
     [HttpGet("suggest")]
     public async Task<IActionResult> GetSuggest(
-        [FromQuery] string keywords,
+        [FromQuery][Required(AllowEmptyStrings = false)] string keywords,
         [FromQuery] int albumTipCount = 10,
         [FromQuery] int correctTipCount = 10,
         [FromQuery] int mvTipCount = 10,
@@ -157,7 +158,7 @@ public class SearchController(
     }
 
     [HttpGet("mixed")]
-    public async Task<IActionResult> GetMixed([FromQuery] string keyword)
+    public async Task<IActionResult> GetMixed([FromQuery][Required(AllowEmptyStrings = false)] string keyword)
     {
         var result = await searchClient.SearchMixedRawAsync(keyword);
         return Ok(result);
@@ -165,7 +166,7 @@ public class SearchController(
 
     [HttpGet("complex")]
     public async Task<IActionResult> GetComplex(
-        [FromQuery] string keywords,
+        [FromQuery][Required(AllowEmptyStrings = false)] string keywords,
         [FromQuery] int page = 1,
         [FromQuery] int pagesize = 30)
     {

@@ -1,6 +1,7 @@
 using KuGou.Net.Adapters.Lyrics;
 using KuGou.Net.Clients;
 using Microsoft.AspNetCore.Mvc;
+using System.ComponentModel.DataAnnotations;
 
 namespace KgWebApi.Net.Controllers;
 
@@ -29,8 +30,8 @@ public class LyricController(LyricClient lyricClient) : ControllerBase
     [HttpGet("lyric")]
     [ProducesResponseType(typeof(LyricResult), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetLyric(
-        [FromQuery] string id,
-        [FromQuery] string accesskey,
+        [FromQuery][Required(AllowEmptyStrings = false)] string id,
+        [FromQuery][Required(AllowEmptyStrings = false)] string accesskey,
         [FromQuery] string fmt = "krc",
         [FromQuery] bool decode = true)
     {
