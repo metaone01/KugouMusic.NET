@@ -4,7 +4,6 @@
                  xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
                  xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
                  xmlns:suki="https://github.com/kikipoulet/SukiUI"
-                 xmlns:behaviors="using:KugouAvaloniaPlayer.Behaviors"
                  xmlns:asyncImageLoader="clr-namespace:AsyncImageLoader;assembly=AsyncImageLoader.Avalonia"
                  xmlns:localControls="clr-namespace:KugouAvaloniaPlayer.Controls"
                  mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="700"
@@ -34,38 +33,6 @@
     </suki:SukiWindow.RightWindowTitleBarControls>
 
     <suki:SukiWindow.Styles>
-        <!-- 遮罩层动画 -->
-        <Style Selector="Border#QueueBackdrop">
-            <Setter Property="Opacity" Value="0" />
-            <Setter Property="IsVisible" Value="False" />
-            <Setter Property="Transitions">
-                <Transitions>
-                    <DoubleTransition Property="Opacity" Duration="0:0:0.2" />
-                </Transitions>
-            </Setter>
-        </Style>
-        <Style Selector="Border#QueueBackdrop.open">
-            <Setter Property="IsVisible" Value="True" />
-            <Setter Property="Opacity" Value="1" />
-        </Style>
-
-        <!-- 播放列表面板动画 -->
-        <Style Selector="Border#QueuePanel">
-            <Setter Property="Opacity" Value="0" />
-            <Setter Property="IsVisible" Value="False" />
-            <Setter Property="RenderTransform" Value="translateY(20px)" />
-            <Setter Property="Transitions">
-                <Transitions>
-                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.3" Easing="CubicEaseOut" />
-                </Transitions>
-            </Setter>
-        </Style>
-        <Style Selector="Border#QueuePanel.open">
-            <Setter Property="IsVisible" Value="True" />
-            <Setter Property="Opacity" Value="1" />
-            <Setter Property="RenderTransform" Value="translateY(0)" />
-        </Style>
-
         <Style Selector="Button.SidebarPlaylistOption">
             <Setter Property="Height" Value="40" />
             <Setter Property="Padding" Value="6,4" />
@@ -412,29 +379,6 @@
 
         <localControls:BottomPlaybackControl />
         <localControls:NowPlaying DataContext="{Binding NowPlaying}" ZIndex="300" />
-
-        <Border Name="QueueBackdrop"
-                Grid.Row="0"
-                Classes.open="{Binding IsQueuePaneOpen}"
-                Background="#40000000"
-                HorizontalAlignment="Stretch"
-                VerticalAlignment="Stretch"
-                behaviors:InteractionBehaviors.PointerPressedCommand="{Binding CloseQueuePaneCommand}"
-                IsVisible="False" />
-
-        <Border Name="QueuePanel"
-                Grid.Row="0"
-                Classes.open="{Binding IsQueuePaneOpen}"
-                HorizontalAlignment="Right"
-                VerticalAlignment="Bottom"
-                Width="360"
-                MinWidth="280"
-                MaxWidth="460"
-                MaxHeight="560"
-                Margin="0,0,20,100"
-                ClipToBounds="False">
-            <localControls:PlaybackQueueControl />
-        </Border>
 
     </Grid>
 

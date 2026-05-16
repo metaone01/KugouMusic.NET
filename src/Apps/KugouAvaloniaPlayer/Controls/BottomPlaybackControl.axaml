@@ -266,11 +266,24 @@
                     </ComboBox>
 
                     <!-- 队列按钮 -->
-                    <Button Cursor="Hand"
-                            Command="{Binding ToggleQueuePaneCommand}"
+                    <Button x:Name="QueueButton"
+                            Cursor="Hand"
                             Classes="Basic"
                             ToolTip.Tip="播放列表"
                             Width="32" Height="32">
+                        <Button.Flyout>
+                            <Flyout Placement="TopEdgeAlignedRight"
+                                    Opening="QueueFlyout_OnOpening"
+                                    Opened="QueueFlyout_OnOpened"
+                                    Closed="QueueFlyout_OnClosed">
+                                <local:PlaybackQueueControl x:Name="QueueFlyoutContent"
+                                                            DataContext="{Binding}"
+                                                            Width="360"
+                                                            MinWidth="280"
+                                                            MaxWidth="460"
+                                                            MaxHeight="560" />
+                            </Flyout>
+                        </Button.Flyout>
                         <Svg Classes="ThemeSvgIcon" Path="/Assets/PlayList.svg" Width="18" Height="18" />
                     </Button>
 

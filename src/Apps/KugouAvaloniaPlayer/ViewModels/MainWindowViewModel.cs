@@ -46,9 +46,6 @@ public partial class MainWindowViewModel : ObservableObject
     public partial bool IsLoggedIn { get; set; }
 
     [ObservableProperty]
-    public partial bool IsQueuePaneOpen { get; set; }
-
-    [ObservableProperty]
     public partial bool IsOnlinePlaylistsExpanded { get; set; } = true;
 
     [ObservableProperty]
@@ -581,18 +578,6 @@ public partial class MainWindowViewModel : ObservableObject
         SidebarAlbumPlaylists.AddRange(PlaylistsViewModel.Items.Where(x => x.Type == PlaylistType.Album));
 
         UpdateSidebarSelection();
-    }
-
-    [RelayCommand]
-    private void ToggleQueuePane()
-    {
-        IsQueuePaneOpen = !IsQueuePaneOpen;
-    }
-
-    [RelayCommand]
-    private void CloseQueuePane()
-    {
-        IsQueuePaneOpen = false;
     }
 
     [RelayCommand]
