@@ -1,18 +1,44 @@
+using KgWebApi.Net.Data;
 using KuGou.Net.Infrastructure;
+using KuGou.Net.Infrastructure.Http;
+using KuGou.Net.Infrastructure.Http.Handlers;
 using KuGou.Net.Protocol.Session;
 using KgWebApi.Net.Services;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.OpenApi;
 using Scalar.AspNetCore;
+using System.Net;
 
 var builder = WebApplication.CreateBuilder(args);
+
+var configuredConnectionString = builder.Configuration.GetConnectionString("KgWebApi");
+var sqliteConnectionString = !string.IsNullOrWhiteSpace(configuredConnectionString)
+    ? configuredConnectionString
+    : $"Data Source={Path.Combine(builder.Environment.ContentRootPath, "App_Data", "kgwebapi.multisession.db")}";
 
 
 // 注册控制器
 builder.Services
-    .AddSingleton<ISessionPersistence, KgWebSessionPersistence>()
     //.AddKuGouTransport()
     .AddKuGouSdk()
     .AddControllers();
+
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<IKgWebSessionContext, KgWebSessionContext>();
+builder.Services.AddDbContext<KgWebApiDbContext>(options => options.UseSqlite(sqliteConnectionString));
+
+builder.Services.RemoveAll<ISessionPersistence>();
+builder.Services.RemoveAll<CookieContainer>();
+builder.Services.RemoveAll<KgSessionManager>();
+builder.Services.RemoveAll<IKgTransport>();
+builder.Services.RemoveAll<KgSignatureHandler>();
+
+builder.Services.AddScoped<ISessionPersistence, KgWebSessionPersistence>();
+builder.Services.AddScoped(_ => new CookieContainer());
+builder.Services.AddScoped<KgSessionManager>();
+builder.Services.AddScoped<KgSignatureHandler>();
+builder.Services.AddScoped<IKgTransport, WebApiKgTransport>();
 
 builder.Services.AddOpenApi(options =>
 {
@@ -30,6 +56,13 @@ builder.Services.AddOpenApi(options =>
 
 var app = builder.Build();
 
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<KgWebApiDbContext>();
+    Directory.CreateDirectory(Path.Combine(builder.Environment.ContentRootPath, "App_Data"));
+    dbContext.Database.EnsureCreated();
+}
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
@@ -41,6 +74,7 @@ if (app.Environment.IsDevelopment())
     });
 }
 
+app.UseMiddleware<KgWebSessionMiddleware>();
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();

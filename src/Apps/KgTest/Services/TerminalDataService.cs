@@ -168,7 +168,7 @@ internal sealed class TerminalDataService(TerminalKugouClients clients)
             Singer = song.SingerName,
             Hash = PreferQualityHash(song.Hash, song.Hash320, song.HashFlac, song.HashHiRes),
             AlbumId = song.AlbumId,
-            MixSongId = song.MixSongId,
+            MixSongId = song.MixSongId.ToString(),
             AudioId = song.AudioId,
             Cover = song.GetCoverUrl(),
             DurationSeconds = song.Duration,

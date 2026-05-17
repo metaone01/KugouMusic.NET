@@ -1,5 +1,4 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Linq;
@@ -46,7 +45,7 @@ public class LyricView : ItemsControl
         AvaloniaProperty.Register<LyricView, bool>(nameof(IsActive), true);
 
     public static readonly StyledProperty<LyricViewPreset> PresetProperty =
-        AvaloniaProperty.Register<LyricView, LyricViewPreset>(nameof(Preset), LyricViewPreset.Default);
+        AvaloniaProperty.Register<LyricView, LyricViewPreset>(nameof(Preset));
 
     public static readonly StyledProperty<double> LineSpacingProperty =
         AvaloniaProperty.Register<LyricView, double>(nameof(LineSpacing), 14d);
@@ -85,12 +84,12 @@ public class LyricView : ItemsControl
         AvaloniaProperty.Register<LyricView, Thickness>(nameof(ItemMargin));
 
     public static readonly StyledProperty<double> SecondaryTopSpacingProperty =
-        AvaloniaProperty.Register<LyricView, double>(nameof(SecondaryTopSpacing), 0d);
+        AvaloniaProperty.Register<LyricView, double>(nameof(SecondaryTopSpacing));
 
     public static readonly StyledProperty<KaraokeClipMode> ClipModeProperty =
         AvaloniaProperty.Register<LyricView, KaraokeClipMode>(nameof(ClipMode), KaraokeClipMode.ByTextWidth);
 
-    public static new readonly StyledProperty<FontFamily> FontFamilyProperty =
+    public new static readonly StyledProperty<FontFamily> FontFamilyProperty =
         TextBlock.FontFamilyProperty.AddOwner<LyricView>();
 
     public static readonly StyledProperty<TextAlignment> TextAlignmentProperty =
@@ -112,13 +111,15 @@ public class LyricView : ItemsControl
         AvaloniaProperty.Register<LyricView, IBrush>(nameof(PrimaryPlayedForeground), Brushes.White);
 
     public static readonly StyledProperty<IBrush> TranslationForegroundProperty =
-        AvaloniaProperty.Register<LyricView, IBrush>(nameof(TranslationForeground), new SolidColorBrush(Color.Parse("#CCFFFFFF")));
+        AvaloniaProperty.Register<LyricView, IBrush>(nameof(TranslationForeground),
+            new SolidColorBrush(Color.Parse("#CCFFFFFF")));
 
     public static readonly StyledProperty<IBrush> TranslationPlayedForegroundProperty =
         AvaloniaProperty.Register<LyricView, IBrush>(nameof(TranslationPlayedForeground), Brushes.White);
 
     public static readonly StyledProperty<IBrush> RomanizationForegroundProperty =
-        AvaloniaProperty.Register<LyricView, IBrush>(nameof(RomanizationForeground), new SolidColorBrush(Color.Parse("#CCFFFFFF")));
+        AvaloniaProperty.Register<LyricView, IBrush>(nameof(RomanizationForeground),
+            new SolidColorBrush(Color.Parse("#CCFFFFFF")));
 
     public static readonly DirectProperty<LyricView, LyricLine?> ActiveLineProperty =
         AvaloniaProperty.RegisterDirect<LyricView, LyricLine?>(nameof(ActiveLine), o => o.ActiveLine);
@@ -129,30 +130,31 @@ public class LyricView : ItemsControl
     public static readonly DirectProperty<LyricView, TimeSpan> RenderPositionProperty =
         AvaloniaProperty.RegisterDirect<LyricView, TimeSpan>(nameof(RenderPosition), o => o.RenderPosition);
 
+    private readonly HashSet<Control> _activeContainers = new();
+
     private readonly Dictionary<int, double> _knownHeights = new();
     private readonly Dictionary<Control, SpringState> _springStates = new();
-    private readonly HashSet<Control> _activeContainers = new();
     private readonly DispatcherTimer _userScrollResetTimer;
-    private double[] _lineCenters = [];
-    private double[] _lineHeights = [];
-    private INotifyCollectionChanged? _collectionChangedSource;
-    private IReadOnlyList<LyricLine> _linesSnapshot = [];
+    private int _activeIndex = -1;
+    private LyricLine? _activeLine;
     private bool _animationFrameQueued;
+    private INotifyCollectionChanged? _collectionChangedSource;
     private bool _deferredActiveItemUpdate;
     private bool _hasLastFrameTimestamp;
+    private bool _isApplyingPreset;
     private bool _isFirstLayoutPass = true;
     private bool _isManualOffsetReturning;
     private bool _isUserScrolling;
-    private bool _layoutUpdateQueued;
     private TimeSpan _lastFrameTimestamp;
+    private bool _layoutUpdateQueued;
+    private double[] _lineCenters = [];
+    private double[] _lineHeights = [];
+    private IReadOnlyList<LyricLine> _linesSnapshot = [];
     private int? _lockedActiveIndex;
     private double _manualOffset;
     private double _manualOffsetTarget;
     private double _manualOffsetVelocity;
-    private LyricLine? _activeLine;
-    private int _activeIndex = -1;
     private TimeSpan _renderPosition;
-    private bool _isApplyingPreset;
 
     public LyricView()
     {
@@ -516,30 +518,88 @@ public class LyricView : ItemsControl
         e.Handled = true;
     }
 
-    private IDataTemplate CreateDefaultItemTemplate()
+    private FuncDataTemplate<LyricLine> CreateDefaultItemTemplate()
     {
-        return new FuncDataTemplate<LyricLine>((line, _) =>
+        return new FuncDataTemplate<LyricLine>((_, _) =>
         {
             var control = new LyricLineControl();
-            control.Bind(LyricLineControl.LineProperty, new Binding());
-            control.Bind(LyricLineControl.ActiveLineProperty, new Binding(nameof(ActiveLine)) { Source = this });
-            control.Bind(LyricLineControl.PositionProperty, new Binding(nameof(RenderPosition)) { Source = this });
-            control.Bind(LyricLineControl.ShowTranslationProperty, new Binding(nameof(ShowTranslation)) { Source = this });
-            control.Bind(LyricLineControl.ShowRomanizationProperty, new Binding(nameof(ShowRomanization)) { Source = this });
-            control.Bind(LyricLineControl.WordRenderModeProperty, new Binding(nameof(WordRenderMode)) { Source = this });
-            control.Bind(LyricLineControl.ClipModeProperty, new Binding(nameof(ClipMode)) { Source = this });
-            control.Bind(MarginProperty, new Binding(nameof(ItemMargin)) { Source = this });
-            control.Bind(LyricLineControl.FontFamilyProperty, new Binding(nameof(FontFamily)) { Source = this });
-            control.Bind(LyricLineControl.TextAlignmentProperty, new Binding(nameof(TextAlignment)) { Source = this });
-            control.Bind(LyricLineControl.SecondaryTopSpacingProperty, new Binding(nameof(SecondaryTopSpacing)) { Source = this });
-            control.Bind(LyricLineControl.PrimaryFontSizeProperty, new Binding(nameof(PrimaryFontSize)) { Source = this });
-            control.Bind(LyricLineControl.TranslationFontSizeProperty, new Binding(nameof(TranslationFontSize)) { Source = this });
-            control.Bind(LyricLineControl.RomanizationFontSizeProperty, new Binding(nameof(RomanizationFontSize)) { Source = this });
-            control.Bind(LyricLineControl.PrimaryForegroundProperty, new Binding(nameof(PrimaryForeground)) { Source = this });
-            control.Bind(LyricLineControl.PrimaryPlayedForegroundProperty, new Binding(nameof(PrimaryPlayedForeground)) { Source = this });
-            control.Bind(LyricLineControl.TranslationForegroundProperty, new Binding(nameof(TranslationForeground)) { Source = this });
-            control.Bind(LyricLineControl.TranslationPlayedForegroundProperty, new Binding(nameof(TranslationPlayedForeground)) { Source = this });
-            control.Bind(LyricLineControl.RomanizationForegroundProperty, new Binding(nameof(RomanizationForeground)) { Source = this });
+
+            control.Bind(
+                LyricLineControl.LineProperty,
+                CompiledBinding.Create<LyricLine, LyricLine>(x => x));
+
+            control.Bind(
+                LyricLineControl.ActiveLineProperty,
+                CompiledBinding.Create<LyricView, LyricLine?>(x => x.ActiveLine, this));
+
+            control.Bind(
+                LyricLineControl.PositionProperty,
+                CompiledBinding.Create<LyricView, TimeSpan>(x => x.RenderPosition, this));
+
+            control.Bind(
+                LyricLineControl.ShowTranslationProperty,
+                CompiledBinding.Create<LyricView, bool>(x => x.ShowTranslation, this));
+
+            control.Bind(
+                LyricLineControl.ShowRomanizationProperty,
+                CompiledBinding.Create<LyricView, bool>(x => x.ShowRomanization, this));
+
+            control.Bind(
+                LyricLineControl.WordRenderModeProperty,
+                CompiledBinding.Create<LyricView, LyricWordRenderMode>(x => x.WordRenderMode, this));
+
+            control.Bind(
+                LyricLineControl.ClipModeProperty,
+                CompiledBinding.Create<LyricView, KaraokeClipMode>(x => x.ClipMode, this));
+
+            control.Bind(
+                MarginProperty,
+                CompiledBinding.Create<LyricView, Thickness>(x => x.ItemMargin, this));
+
+            control.Bind(
+                LyricLineControl.FontFamilyProperty,
+                CompiledBinding.Create<LyricView, FontFamily>(x => x.FontFamily, this));
+
+            control.Bind(
+                LyricLineControl.TextAlignmentProperty,
+                CompiledBinding.Create<LyricView, TextAlignment>(x => x.TextAlignment, this));
+
+            control.Bind(
+                LyricLineControl.SecondaryTopSpacingProperty,
+                CompiledBinding.Create<LyricView, double>(x => x.SecondaryTopSpacing, this));
+
+            control.Bind(
+                LyricLineControl.PrimaryFontSizeProperty,
+                CompiledBinding.Create<LyricView, double>(x => x.PrimaryFontSize, this));
+
+            control.Bind(
+                LyricLineControl.TranslationFontSizeProperty,
+                CompiledBinding.Create<LyricView, double>(x => x.TranslationFontSize, this));
+
+            control.Bind(
+                LyricLineControl.RomanizationFontSizeProperty,
+                CompiledBinding.Create<LyricView, double>(x => x.RomanizationFontSize, this));
+
+            control.Bind(
+                LyricLineControl.PrimaryForegroundProperty,
+                CompiledBinding.Create<LyricView, IBrush?>(x => x.PrimaryForeground, this));
+
+            control.Bind(
+                LyricLineControl.PrimaryPlayedForegroundProperty,
+                CompiledBinding.Create<LyricView, IBrush?>(x => x.PrimaryPlayedForeground, this));
+
+            control.Bind(
+                LyricLineControl.TranslationForegroundProperty,
+                CompiledBinding.Create<LyricView, IBrush?>(x => x.TranslationForeground, this));
+
+            control.Bind(
+                LyricLineControl.TranslationPlayedForegroundProperty,
+                CompiledBinding.Create<LyricView, IBrush?>(x => x.TranslationPlayedForeground, this));
+
+            control.Bind(
+                LyricLineControl.RomanizationForegroundProperty,
+                CompiledBinding.Create<LyricView, IBrush?>(x => x.RomanizationForeground, this));
+
             return control;
         });
     }
@@ -689,7 +749,7 @@ public class LyricView : ItemsControl
 
             targetOpacity *= CalculateEdgeFadeFactor(targetTop, height);
 
-            double targetScale = 1d;
+            var targetScale = 1d;
             if (EnableScale && distance > 0)
                 targetScale = InactiveScale;
 
@@ -726,15 +786,10 @@ public class LyricView : ItemsControl
         var right = _linesSnapshot.Count - 1;
 
         if (position < _linesSnapshot[0].Start)
-        {
             resultIndex = 0;
-        }
         else if (position >= _linesSnapshot[^1].Start)
-        {
             resultIndex = _linesSnapshot.Count - 1;
-        }
         else
-        {
             while (left <= right)
             {
                 var mid = left + (right - left) / 2;
@@ -748,7 +803,6 @@ public class LyricView : ItemsControl
                     right = mid - 1;
                 }
             }
-        }
 
         SetAndRaise(ActiveLineProperty, ref _activeLine, _linesSnapshot[resultIndex]);
         SetAndRaise(ActiveIndexProperty, ref _activeIndex, resultIndex);
@@ -761,11 +815,12 @@ public class LyricView : ItemsControl
             null => [],
             IReadOnlyList<LyricLine> readOnlyList => readOnlyList,
             IList<LyricLine> list => list.ToList(),
-            IEnumerable<LyricLine> enumerable => enumerable.ToList()
+            var enumerable => enumerable.ToList()
         };
     }
 
-    private void UpdateSpringState(Control container, double targetTop, double targetOpacity, double targetScale, int index, int activeIndex)
+    private void UpdateSpringState(Control container, double targetTop, double targetOpacity, double targetScale,
+        int index, int activeIndex)
     {
         var isEntrance = EnableAnimation && _isFirstLayoutPass && !_isUserScrolling;
         var topDelay = isEntrance
@@ -782,22 +837,7 @@ public class LyricView : ItemsControl
             _springStates[container] = state;
         }
 
-        if (_isUserScrolling)
-        {
-            state.CurrentTop = targetTop;
-            state.TargetTop = targetTop;
-            state.Velocity = 0d;
-            state.CurrentOpacity = targetOpacity;
-            state.TargetOpacity = targetOpacity;
-            state.CurrentScale = targetScale;
-            state.TargetScale = targetScale;
-            state.ClearPendingTarget();
-            state.IsInitialized = true;
-            ApplyVisualState(container, state);
-            return;
-        }
-
-        if (!EnableAnimation)
+        if (_isUserScrolling || !EnableAnimation)
         {
             state.CurrentTop = targetTop;
             state.TargetTop = targetTop;
@@ -964,7 +1004,8 @@ public class LyricView : ItemsControl
         _lastFrameTimestamp = timestamp;
         var deltaSeconds = Math.Clamp(elapsed.TotalSeconds, 1d / 240d, 1d / 20d);
         var frameFactor = deltaSeconds * 60d;
-        var durationFactor = Math.Clamp(BaseScrollDurationMs / Math.Max(120d, ScrollDuration.TotalMilliseconds), 0.55d, 2.2d);
+        var durationFactor = Math.Clamp(BaseScrollDurationMs / Math.Max(120d, ScrollDuration.TotalMilliseconds), 0.55d,
+            2.2d);
         var springStiffness = BaseSpringStiffness * durationFactor * durationFactor;
         var springDamping = Math.Pow(BaseSpringDamping, durationFactor);
         var opacityFactor = 1d - Math.Exp(-OpacityResponse * deltaSeconds);
@@ -1001,22 +1042,14 @@ public class LyricView : ItemsControl
             }
 
             if (Math.Abs(state.TargetOpacity - state.CurrentOpacity) > SettleOpacityThreshold)
-            {
                 hasActiveMotion = true;
-            }
             else
-            {
                 state.CurrentOpacity = state.TargetOpacity;
-            }
 
             if (Math.Abs(state.TargetScale - state.CurrentScale) > 0.001d)
-            {
                 hasActiveMotion = true;
-            }
             else
-            {
                 state.CurrentScale = state.TargetScale;
-            }
 
             ApplyVisualState(container, state);
         }

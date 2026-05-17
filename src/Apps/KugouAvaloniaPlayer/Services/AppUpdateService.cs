@@ -6,9 +6,9 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Notifications;
 using Avalonia.Layout;
+using Avalonia.Styling;
 using Avalonia.Threading;
 using Microsoft.Extensions.Logging;
-using SukiUI.Enums;
 using SukiUI.Toasts;
 using Velopack;
 using Velopack.Sources;
@@ -159,12 +159,11 @@ public sealed class AppUpdateService(
         toastManager.CreateToast()
             .WithTitle("发现新版本")
             .WithContent($"版本 {primarySource.UpdateInfo.TargetFullRelease.Version} 现已发布，详细可在设置“更新与关于”中查看，是否立即更新？")
-            .WithActionButton("稍后", _ => { }, true, SukiButtonStyles.Standard)
-            .WithActionButton("立即更新", toast =>
+            .WithActionButton(CreateStandardToastActionButton("稍后"), _ => { }, true)
+            .WithActionButton(CreateStandardToastActionButton("立即更新"), toast =>
             {
                 _ = ShowUpdatingToastAndDownloadAsync(updateSources);
-            },
-                true, SukiButtonStyles.Standard)
+            }, true)
             .Queue();
     }
 
@@ -338,10 +337,27 @@ public sealed class AppUpdateService(
             .OfType(NotificationType.Success)
             .WithTitle("更新就绪")
             .WithContent("新版本已下载完毕，重启软件即可应用更新。")
-            .WithActionButton("稍后", _ => { }, true, SukiButtonStyles.Standard)
-            .WithActionButton("立即重启", _ => { updateManager.ApplyUpdatesAndRestart(newVersion); }, true,
-                SukiButtonStyles.Standard)
+            .WithActionButton(CreateStandardToastActionButton("稍后"), _ => { }, true)
+            .WithActionButton(CreateStandardToastActionButton("立即重启"), _ => { updateManager.ApplyUpdatesAndRestart(newVersion); }, true)
             .Queue();
+    }
+
+    private static Button CreateStandardToastActionButton(object content)
+    {
+        var button = new Button
+        {
+            Content = content,
+            Margin = new Thickness(14, 9, 0, 12)
+        };
+
+        ApplyClass(button.Classes, "Standard");
+        return button;
+    }
+
+    private static void ApplyClass(Classes classes, string className)
+    {
+        if (!classes.Contains(className))
+            classes.Add(className);
     }
 
     private sealed record UpdateSourceCandidate(
