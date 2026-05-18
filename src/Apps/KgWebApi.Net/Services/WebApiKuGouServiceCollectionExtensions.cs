@@ -1,5 +1,6 @@
 using System.Net;
 using KuGou.Net.Clients;
+using KuGou.Net.ExternalPlaylists;
 using KuGou.Net.Protocol.Session;
 
 namespace KgWebApi.Net.Services;
@@ -35,6 +36,9 @@ public static class WebApiKuGouServiceCollectionExtensions
         services.AddScopedFromKuGouProvider<SceneClient>();
         services.AddScopedFromKuGouProvider<ThemeClient>();
         services.AddScopedFromKuGouProvider<ReportClient>();
+        services.AddSingleton<IExternalPlaylistParser, ExternalPlaylistParser>();
+        services.AddSingleton<IExternalPlaylistParseStrategy, NeteasePlaylistParseStrategy>();
+        services.AddSingleton<IExternalPlaylistParseStrategy, QqMusicPlaylistParseStrategy>();
 
         return services;
     }

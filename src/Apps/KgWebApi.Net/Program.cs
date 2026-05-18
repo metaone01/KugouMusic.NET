@@ -18,6 +18,7 @@ var sqliteConnectionString = !string.IsNullOrWhiteSpace(configuredConnectionStri
 builder.Services
     .AddControllers();
 
+builder.Services.AddHttpClient();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IKgWebSessionContext, KgWebSessionContext>();
 builder.Services.AddDbContext<KgWebApiDbContext>(options => options.UseSqlite(sqliteConnectionString));

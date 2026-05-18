@@ -3,6 +3,7 @@ using System.Net.Http;
 using Avalonia.Threading;
 using Jab;
 using KuGou.Net.Clients;
+using KuGou.Net.ExternalPlaylists;
 using KuGou.Net.Infrastructure;
 using KuGou.Net.Infrastructure.Http;
 using KuGou.Net.Infrastructure.Http.Handlers;
@@ -26,6 +27,7 @@ namespace KugouAvaloniaPlayer.Services;
 [Singleton<ISukiDialogManager, SukiDialogManager>]
 [Singleton<IHttpClientFactory, SimpleHttpClientFactory>]
 [Singleton<ICreatePlaylistDialogService, CreatePlaylistDialogService>]
+[Singleton<IExternalPlaylistParser, ExternalPlaylistParser>]
 [Singleton<IExternalPlaylistParseStrategy, NeteasePlaylistParseStrategy>]
 [Singleton<IExternalPlaylistParseStrategy, QqMusicPlaylistParseStrategy>]
 [Singleton<IExternalPlaylistImportService, ExternalPlaylistImportService>]
