@@ -96,6 +96,17 @@ namespace KuGou.Net.util;
 [JsonSerializable(typeof(List<CommentHotWord>))]
 [JsonSerializable(typeof(List<CommentClassifyItem>))]
 [JsonSerializable(typeof(List<CommentTag>))]
+[JsonSerializable(typeof(FmRecommendResponse))]
+[JsonSerializable(typeof(List<FmRecommendCategory>))]
+[JsonSerializable(typeof(List<FmRecommendSong>))]
+[JsonSerializable(typeof(FmSongResponse))]
+[JsonSerializable(typeof(FmSongData))]
+[JsonSerializable(typeof(FmSongItem))]
+[JsonSerializable(typeof(List<FmSongItem>))]
+[JsonSerializable(typeof(FmTransParam))]
+[JsonSerializable(typeof(FmImageResponse))]
+[JsonSerializable(typeof(FmImageData))]
+[JsonSerializable(typeof(List<FmImageData>))]
 internal partial class AppJsonContext : JsonSerializerContext
 {
 }

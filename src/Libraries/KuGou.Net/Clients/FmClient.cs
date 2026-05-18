@@ -1,18 +1,23 @@
 using System.Text.Json;
+using KuGou.Net.Abstractions.Models;
+using KuGou.Net.Adapters.Common;
 using KuGou.Net.Protocol.Raw;
+using KuGou.Net.util;
 
 namespace KuGou.Net.Clients;
 
 public class FmClient(RawFmApi rawApi)
 {
-    public Task<JsonElement> GetRecommendAsync()
+    public async Task<FmRecommendResponse?> GetRecommendAsync()
     {
-        return rawApi.GetRecommendAsync();
+        var json = await rawApi.GetRecommendAsync();
+        return KgApiResponseParser.Parse<FmRecommendResponse>(json, AppJsonContext.Default.FmRecommendResponse);
     }
 
-    public Task<JsonElement> GetSongsAsync(string fmIds, int type = 2, int offset = -1, int size = 20)
+    public async Task<FmSongResponse?> GetSongsAsync(string fmIds, int type = 2, int offset = -1, int size = 20)
     {
-        return rawApi.GetSongsAsync(fmIds, type, offset, size);
+        var json = await rawApi.GetSongsAsync(fmIds, type, offset, size);
+        return KgApiResponseParser.Parse<FmSongResponse>(json, AppJsonContext.Default.FmSongResponse);
     }
 
     public Task<JsonElement> GetClassSongAsync()
@@ -20,8 +25,9 @@ public class FmClient(RawFmApi rawApi)
         return rawApi.GetClassSongAsync();
     }
 
-    public Task<JsonElement> GetImagesAsync(string fmIds)
+    public async Task<FmImageResponse?> GetImagesAsync(string fmIds)
     {
-        return rawApi.GetImagesAsync(fmIds);
+        var json = await rawApi.GetImagesAsync(fmIds);
+        return KgApiResponseParser.Parse<FmImageResponse>(json, AppJsonContext.Default.FmImageResponse);
     }
 }

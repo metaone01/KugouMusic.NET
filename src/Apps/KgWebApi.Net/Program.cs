@@ -5,7 +5,6 @@ using KuGou.Net.Infrastructure.Http;
 using KuGou.Net.Infrastructure.Http.Handlers;
 using KuGou.Net.Protocol.Session;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.OpenApi;
 using Scalar.AspNetCore;
 using System.Net;
@@ -20,19 +19,12 @@ var sqliteConnectionString = !string.IsNullOrWhiteSpace(configuredConnectionStri
 
 // 注册控制器
 builder.Services
-    //.AddKuGouTransport()
-    .AddKuGouSdk()
     .AddControllers();
 
+builder.Services.AddHttpClient();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IKgWebSessionContext, KgWebSessionContext>();
 builder.Services.AddDbContext<KgWebApiDbContext>(options => options.UseSqlite(sqliteConnectionString));
-
-builder.Services.RemoveAll<ISessionPersistence>();
-builder.Services.RemoveAll<CookieContainer>();
-builder.Services.RemoveAll<KgSessionManager>();
-builder.Services.RemoveAll<IKgTransport>();
-builder.Services.RemoveAll<KgSignatureHandler>();
 
 builder.Services.AddScoped<ISessionPersistence, KgWebSessionPersistence>();
 builder.Services.AddScoped(_ => new CookieContainer());
@@ -48,6 +40,8 @@ builder.Services.AddCors(options =>
               .AllowAnyHeader();
     });
 });
+builder.Services.AddWebApiKuGouServices();
+
 builder.Services.AddOpenApi(options =>
 {
     options.AddDocumentTransformer((document, _, _) =>

@@ -4,27 +4,22 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Avalonia.Styling;
 using Avalonia.Threading;
-using KuGou.Net.Infrastructure;
-using KuGou.Net.Protocol.Session;
 using KugouAvaloniaPlayer.Models;
 using KugouAvaloniaPlayer.Services;
-using KugouAvaloniaPlayer.Services.DesktopLyric;
 using KugouAvaloniaPlayer.Services.GlobalShortcutService;
 using KugouAvaloniaPlayer.Services.SystemMediaSession;
 using KugouAvaloniaPlayer.ViewModels;
 using KugouAvaloniaPlayer.Views;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using SimpleAudio;
 using SukiUI;
-using SukiUI.Dialogs;
-using SukiUI.Toasts;
 
 namespace KugouAvaloniaPlayer;
 
 public partial class App : Application
 {
-    private ServiceProvider? _serviceProvider;
+    private AvaloniaAppServiceProvider? _serviceProvider;
+    private ILoggerFactory? _loggerFactory;
 
     public override void Initialize()
     {
@@ -37,8 +32,7 @@ public partial class App : Application
     public override void OnFrameworkInitializationCompleted()
     {
         SimpleAudioPlayer.Initialize();
-        var collection = new ServiceCollection();
-        collection.AddLogging(builder =>
+        _loggerFactory = LoggerFactory.Create(builder =>
         {
             builder.SetMinimumLevel(LogLevel.Information);
             builder.AddFilter("System.Net.Http.HttpClient", LogLevel.Warning);
@@ -46,64 +40,18 @@ public partial class App : Application
             builder.AddDebug();
             builder.AddConsole();
         });
-        collection.AddSingleton<ISessionPersistence, KugouSessionPersistence>();
-        collection.AddKuGouSdk();
-
-        var uiDispatcher = Dispatcher.CurrentDispatcher;
-
-        collection.AddSingleton<ISukiToastManager, SukiToastManager>();
-        collection.AddSingleton<ISukiDialogManager, SukiDialogManager>();
-        collection.AddSingleton<IUiDispatcherService>(new UiDispatcherService(uiDispatcher));
-        collection.AddSingleton<ICreatePlaylistDialogService, CreatePlaylistDialogService>();
-        collection.AddSingleton<IExternalPlaylistParseStrategy, NeteasePlaylistParseStrategy>();
-        collection.AddSingleton<IExternalPlaylistParseStrategy, QqMusicPlaylistParseStrategy>();
-        collection.AddSingleton<IExternalPlaylistImportService, ExternalPlaylistImportService>();
-        collection.AddSingleton<ILoginDialogService, LoginDialogService>();
-        collection.AddSingleton<INavigationService, NavigationService>();
-        collection.AddSingleton<IMainWindowService, MainWindowService>();
-        collection.AddSingleton<IDesktopLyricMousePassthroughService, DesktopLyricMousePassthroughService>();
-        collection.AddSingleton<IDesktopLyricWindowService, DesktopLyricWindowService>();
-        collection.AddSingleton<IGlobalShortcutService, GlobalShortcutService>();
-        collection.AddSingleton<ISystemMediaSessionService, SystemMediaSessionService>();
-        collection.AddSingleton<IFolderPickerService, FolderPickerService>();
-        collection.AddSingleton<IGitHubReleaseService, GitHubReleaseService>();
-        collection.AddSingleton<IAppUpdateService, AppUpdateService>();
 
         SettingsManager.Load();
         ApplySavedTheme();
-
-        // 注册 ViewModels
-        collection.AddTransient<LoginViewModel>();
-        collection.AddTransient<SearchViewModel>();
-        collection.AddTransient<SingerViewModel>();
-        collection.AddTransient<UserViewModel>();
-        collection.AddTransient<NowPlayingViewModel>();
-        collection.AddTransient<MainWindowViewModel>();
-        collection.AddTransient<DailyRecommendViewModel>();
-        collection.AddTransient<HistoryViewModel>();
-        collection.AddTransient<DiscoverViewModel>();
-        collection.AddTransient<MyPlaylistsViewModel>();
-        collection.AddTransient<EqSettingsViewModel>();
-        collection.AddTransient<ISingerViewModelFactory, SingerViewModelFactory>();
-        collection.AddTransient<RankViewModel>();
-        
-        collection.AddSingleton<IDesktopLyricViewModelFactory, DesktopLyricViewModelFactory>();
-        collection.AddSingleton<PlaybackQueueManager>();
-        collection.AddSingleton<LyricsService>();
-        collection.AddSingleton<FavoritePlaylistService>();
-        collection.AddSingleton<PlaybackHistoryService>();
-        collection.AddSingleton<IPlaybackSourceResolver, PlaybackSourceResolver>();
-        collection.AddSingleton<IPlaybackCoordinator, PlaybackCoordinator>();
-        collection.AddSingleton<ITransitionAnalysisService, ManagedBassTransitionAnalysisService>();
-        collection.AddSingleton<PlayerViewModel>();
-
-        
-
-        _serviceProvider = collection.BuildServiceProvider();
+        _serviceProvider = new AvaloniaAppServiceProvider
+        {
+            LoggerFactory = _loggerFactory,
+            UiDispatcher = Dispatcher.CurrentDispatcher
+        };
         var services = _serviceProvider;
 
-        var vm = services.GetRequiredService<MainWindowViewModel>();
-        var playerVm = services.GetRequiredService<PlayerViewModel>();
+        var vm = services.GetService<MainWindowViewModel>();
+        var playerVm = services.GetService<PlayerViewModel>();
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             var mainWindow = new MainWindow
@@ -112,8 +60,8 @@ public partial class App : Application
             };
             desktop.MainWindow = mainWindow;
 
-            var globalShortcutService = services.GetRequiredService<IGlobalShortcutService>();
-            var systemMediaSessionService = services.GetRequiredService<ISystemMediaSessionService>();
+            var globalShortcutService = services.GetService<IGlobalShortcutService>();
+            var systemMediaSessionService = services.GetService<ISystemMediaSessionService>();
 
             void InitializeGlobalShortcuts(object? _, EventArgs __)
             {
@@ -133,6 +81,7 @@ public partial class App : Application
                 ShutdownTrayIcon();
                 SimpleAudioPlayer.Free();
                 _serviceProvider?.Dispose();
+                _loggerFactory?.Dispose();
             };
         }
 
