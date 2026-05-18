@@ -4,22 +4,14 @@ using KuGou.Net.Protocol.Session;
 
 namespace KgWebApi.Net.Services;
 
-public sealed class KgWebSessionPersistence : ISessionPersistence
+public sealed class KgWebSessionPersistence(KgWebApiDbContext dbContext, IKgWebSessionContext sessionContext)
+    : ISessionPersistence
 {
-    private readonly KgWebApiDbContext _dbContext;
-    private readonly IKgWebSessionContext _sessionContext;
-
-    public KgWebSessionPersistence(KgWebApiDbContext dbContext, IKgWebSessionContext sessionContext)
-    {
-        _dbContext = dbContext;
-        _sessionContext = sessionContext;
-    }
-
     public KgSession? Load()
     {
         try
         {
-            var entity = _dbContext.Sessions.Find(GetSessionKey());
+            var entity = dbContext.Sessions.Find(GetSessionKey());
             return entity is null ? null : ToSession(entity);
         }
         catch
@@ -33,17 +25,17 @@ public sealed class KgWebSessionPersistence : ISessionPersistence
         try
         {
             var sessionKey = GetSessionKey();
-            var entity = _dbContext.Sessions.Find(sessionKey);
+            var entity = dbContext.Sessions.Find(sessionKey);
 
             if (entity is null)
             {
                 entity = new KgSessionEntity { SessionKey = sessionKey };
-                _dbContext.Sessions.Add(entity);
+                dbContext.Sessions.Add(entity);
             }
 
             ApplySession(entity, session);
             entity.UpdatedAtUtc = DateTimeOffset.UtcNow;
-            _dbContext.SaveChanges();
+            dbContext.SaveChanges();
         }
         catch
         {
@@ -54,11 +46,11 @@ public sealed class KgWebSessionPersistence : ISessionPersistence
     {
         try
         {
-            var entity = _dbContext.Sessions.Find(GetSessionKey());
+            var entity = dbContext.Sessions.Find(GetSessionKey());
             if (entity is null) return;
 
-            _dbContext.Sessions.Remove(entity);
-            _dbContext.SaveChanges();
+            dbContext.Sessions.Remove(entity);
+            dbContext.SaveChanges();
         }
         catch
         {
@@ -100,8 +92,8 @@ public sealed class KgWebSessionPersistence : ISessionPersistence
 
     private string GetSessionKey()
     {
-        return string.IsNullOrWhiteSpace(_sessionContext.SessionKey)
+        return string.IsNullOrWhiteSpace(sessionContext.SessionKey)
             ? KgWebSessionDefaults.FallbackSessionKey
-            : _sessionContext.SessionKey;
+            : sessionContext.SessionKey;
     }
 }
