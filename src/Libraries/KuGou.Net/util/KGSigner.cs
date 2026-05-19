@@ -13,10 +13,10 @@ public static class KgSigner
     }
 
 
-    public static string CalcPostSignature(Dictionary<string, string> queryParams, string jsonBody)
+    public static string CalcPostSignature(Dictionary<string, string> queryParams, string jsonBody,
+        string salt = KuGouConfig.LiteSalt)
     {
         var sb = new StringBuilder();
-        var salt = KuGouConfig.LiteSalt;
 
         sb.Append(salt);
 

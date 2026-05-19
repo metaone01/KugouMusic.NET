@@ -1,6 +1,7 @@
 using System.Text.Json;
 using KuGou.Net.Infrastructure.Http;
 using KuGou.Net.Protocol.Transport;
+using KuGou.Net.util;
 
 namespace KuGou.Net.Protocol.Raw;
 
@@ -58,6 +59,8 @@ public class RawCommentApi(IKgTransport transport)
     {
         var parameters = new Dictionary<string, string>
         {
+            ["appid"] = KuGouConfig.OfficialAppId,
+            ["clientver"] = KuGouConfig.OfficialClientVer,
             ["r"] = "comments/getcommentsnum",
             ["code"] = "fc4be23b4e972707f36b8a828a93ba8a"
         };
@@ -124,8 +127,8 @@ public class RawCommentApi(IKgTransport transport)
         {
             Method = HttpMethod.Post,
             Path = useServiceEndpoint ? "/m.comment.service/v1/hot_replylist" : "/mcomment/v1/hot_replylist",
-            Params = parameters,
-            SignatureType = SignatureType.Default
+            Params = UseOfficialApp(parameters),
+            SignatureType = SignatureType.OfficialAndroid
         });
     }
 
@@ -136,7 +139,7 @@ public class RawCommentApi(IKgTransport transport)
         {
             Method = HttpMethod.Post,
             Path = "/mcomment/v1/cmt_classify_list",
-            Params = new Dictionary<string, string>
+            Params = UseOfficialApp(new Dictionary<string, string>
             {
                 ["mixsongid"] = mixSongId,
                 ["need_show_image"] = "1",
@@ -146,8 +149,8 @@ public class RawCommentApi(IKgTransport transport)
                 ["extdata"] = "0",
                 ["code"] = "fc4be23b4e972707f36b8a828a93ba8a",
                 ["sort_method"] = sort == 2 ? "2" : "1"
-            },
-            SignatureType = SignatureType.Default
+            }),
+            SignatureType = SignatureType.OfficialAndroid
         });
     }
 
@@ -158,7 +161,7 @@ public class RawCommentApi(IKgTransport transport)
         {
             Method = HttpMethod.Post,
             Path = "/mcomment/v1/get_hot_word",
-            Params = new Dictionary<string, string>
+            Params = UseOfficialApp(new Dictionary<string, string>
             {
                 ["mixsongid"] = mixSongId,
                 ["need_show_image"] = "1",
@@ -167,8 +170,8 @@ public class RawCommentApi(IKgTransport transport)
                 ["hot_word"] = hotWord,
                 ["extdata"] = "0",
                 ["code"] = "fc4be23b4e972707f36b8a828a93ba8a"
-            },
-            SignatureType = SignatureType.Default
+            }),
+            SignatureType = SignatureType.OfficialAndroid
         });
     }
 
@@ -178,8 +181,15 @@ public class RawCommentApi(IKgTransport transport)
         {
             Method = HttpMethod.Post,
             Path = path,
-            Params = parameters,
-            SignatureType = SignatureType.Default
+            Params = UseOfficialApp(parameters),
+            SignatureType = SignatureType.OfficialAndroid
         });
+    }
+
+    private static Dictionary<string, string> UseOfficialApp(Dictionary<string, string> parameters)
+    {
+        parameters["appid"] = KuGouConfig.OfficialAppId;
+        parameters["clientver"] = KuGouConfig.OfficialClientVer;
+        return parameters;
     }
 }

@@ -122,6 +122,9 @@ public record CommentLikeInfo
 
 public record CommentImage
 {
+    /// <summary>
+    /// 评论下的图片（类似表情包？）
+    /// </summary>
     [property: JsonPropertyName("url")]
     public string Url { get; set; } = string.Empty;
 

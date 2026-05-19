@@ -5,6 +5,7 @@ namespace KuGou.Net.Protocol.Transport;
 public enum SignatureType
 {
     Default, // V3/V4 常规签名
+    OfficialAndroid, // 正式版 Android 签名
     V5, // V5 获取播放链接专用
     Web, // 扫码登录等 Web 接口
     Register, // 设备注册等注册接口

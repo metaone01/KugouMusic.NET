@@ -74,6 +74,8 @@ public class KgSignatureHandler(KgSessionManager sessionManager) : DelegatingHan
             signature = KgSigner.CalcWebQrSignature(mergedParams);
         else if (kgReq.SignatureType == SignatureType.Register)
             signature = KgSigner.CalcPostSignature(mergedParams, jsonBody);
+        else if (kgReq.SignatureType == SignatureType.OfficialAndroid)
+            signature = KgSigner.CalcPostSignature(mergedParams, jsonBody, KuGouConfig.OfficialSalt);
         else
             signature = KgSigner.CalcPostSignature(mergedParams, jsonBody);
 

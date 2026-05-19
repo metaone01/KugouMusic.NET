@@ -2,6 +2,10 @@ namespace KuGou.Net.util;
 
 public static class KuGouConfig
 {
+    // ================= 身份标识 (正式版) =================
+    public const string OfficialAppId = "1005";
+    public const string OfficialClientVer = "20489";
+
     // ================= 身份标识 (Lite版) =================
     public const string AppId = "3116";
     public const string ClientVer = "11440";
@@ -14,6 +18,7 @@ public static class KuGouConfig
 
     // 用于计算 Signature (通用)
     public const string LiteSalt = "LnT6xpN3khm36zse0QzvmgTZ3waWdRSA";
+    public const string OfficialSalt = "OIlwieks28dk2k092lksi2UIkp";
 
     // ================= 设备指纹 (建议持久化，这里暂时写死) =================
     public const string Dfid = "-";
