@@ -31,7 +31,16 @@ var sqliteConnectionString = !string.IsNullOrWhiteSpace(configuredConnectionStri
 builder.Services
     .AddControllers();
 
-builder.Services.AddHttpClient();
+builder.Services.AddHttpClient(WebApiKgHttpClientNames.KuGou)
+    .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+    {
+        UseCookies = false,
+        AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate,
+        PooledConnectionLifetime = TimeSpan.FromMinutes(10),
+        PooledConnectionIdleTimeout = TimeSpan.FromMinutes(2),
+        MaxConnectionsPerServer = 64
+    })
+    .SetHandlerLifetime(Timeout.InfiniteTimeSpan);
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IKgWebSessionContext, KgWebSessionContext>();
 builder.Services.AddDbContext<KgWebApiDbContext>(options => options.UseSqlite(sqliteConnectionString));

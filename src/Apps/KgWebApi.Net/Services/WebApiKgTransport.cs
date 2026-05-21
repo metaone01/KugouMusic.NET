@@ -11,16 +11,20 @@ public sealed class WebApiKgTransport : IKgTransport, IDisposable
     private readonly HttpClient _client;
     private readonly KgHttpTransport _transport;
 
-    public WebApiKgTransport(CookieContainer cookieContainer, KgSignatureHandler signatureHandler)
+    public WebApiKgTransport(
+        CookieContainer cookieContainer,
+        KgSignatureHandler signatureHandler,
+        IHttpMessageHandlerFactory messageHandlerFactory)
     {
-        signatureHandler.InnerHandler = new HttpClientHandler
+        var pooledHandler = messageHandlerFactory.CreateHandler(WebApiKgHttpClientNames.KuGou);
+        var cookieHandler = new WebApiCookieContainerHandler(cookieContainer)
         {
-            UseCookies = true,
-            CookieContainer = cookieContainer,
-            AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate
+            InnerHandler = pooledHandler
         };
 
-        _client = new HttpClient(signatureHandler, disposeHandler: true);
+        signatureHandler.InnerHandler = cookieHandler;
+
+        _client = new HttpClient(signatureHandler, disposeHandler: false);
         _transport = new KgHttpTransport(_client);
     }
 
