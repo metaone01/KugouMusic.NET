@@ -411,6 +411,7 @@ public partial class PlayerViewModel : ViewModelBase, IDisposable
                 _toastManager.CreateToast()
                     .OfType(NotificationType.Warning)
                     .WithTitle("播放失败")
+                    .Dismiss().After(TimeSpan.FromSeconds(3))
                     .WithContent("队列中没有可播放的歌曲")
                     .Queue();
             }
