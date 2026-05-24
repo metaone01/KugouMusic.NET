@@ -494,6 +494,7 @@
                                   Lines="{Binding Player.RenderLyricLines}"
                                   Position="{Binding Player.CurrentPosition}"
                                   IsPositionClockRunning="{Binding Player.IsPlayingAudio}"
+                                  SeekCommand="{Binding Player.SeekToLyricLineCommand}"
                                   IsActive="{Binding IsOpen}"
                                   Preset="AppleMusicClassic"
                                   Margin="{Binding LyricsMargin}"

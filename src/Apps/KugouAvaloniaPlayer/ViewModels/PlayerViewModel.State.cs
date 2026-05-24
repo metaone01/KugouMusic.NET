@@ -1,14 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Avalonia.Collections;
 using Avalonia.Controls.Notifications;
-using SimpleAudio;
+using CommunityToolkit.Mvvm.Input;
 using KugouAvaloniaPlayer.Services;
 using Microsoft.Extensions.Logging;
+using SimpleAudio;
 using SukiUI.Toasts;
 
 namespace KugouAvaloniaPlayer.ViewModels;
@@ -76,6 +75,17 @@ public partial class PlayerViewModel
 
         _player.SetPosition(TimeSpan.FromSeconds(value));
         SyncCurrentLyricFromPosition(value * 1000);
+    }
+
+    [RelayCommand]
+    private void SeekToLyricLine(TimeSpan position)
+    {
+        var targetSeconds = position.TotalSeconds;
+        var maxSeconds = TotalDurationSeconds > 0
+            ? TotalDurationSeconds
+            : Math.Max(0, targetSeconds);
+
+        CurrentPositionSeconds = Math.Clamp(targetSeconds, 0, maxSeconds);
     }
 
     partial void OnMusicVolumeChanged(float value)

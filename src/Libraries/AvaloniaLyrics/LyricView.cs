@@ -3,8 +3,10 @@ using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Diagnostics;
 using System.Linq;
+using System.Windows.Input;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Templates;
 using Avalonia.Data;
 using Avalonia.Input;
@@ -26,6 +28,7 @@ public class LyricView : ItemsControl
     private const double BaseScrollDurationMs = 256;
     private const double ManualOffsetReturnStiffness = 0.052;
     private const double ManualOffsetReturnDamping = 0.78;
+    private const double WheelScrollStep = 52d;
     private const double OpacityResponse = 9.0;
     private const double SettleTopThreshold = 0.22;
     private const double SettleVelocityThreshold = 0.12;
@@ -37,6 +40,11 @@ public class LyricView : ItemsControl
     private const double VisualTopUpdateThreshold = 0.05d;
     private const double VisualOpacityUpdateThreshold = 0.002d;
     private const double VisualScaleUpdateThreshold = 0.0005d;
+    private const double SeekIndicatorPanelWidth = 118d;
+    private const double SeekIndicatorPanelHeight = 34d;
+    private const double SeekIndicatorLineWidth = 46d;
+    private const double SeekIndicatorRightMargin = 14d;
+    private const double SeekIndicatorGap = 6d;
 
     public static readonly StyledProperty<IEnumerable<LyricLine>?> LinesProperty =
         AvaloniaProperty.Register<LyricView, IEnumerable<LyricLine>?>(nameof(Lines));
@@ -95,6 +103,12 @@ public class LyricView : ItemsControl
     public static readonly StyledProperty<KaraokeClipMode> ClipModeProperty =
         AvaloniaProperty.Register<LyricView, KaraokeClipMode>(nameof(ClipMode), KaraokeClipMode.ByTextWidth);
 
+    public static readonly StyledProperty<bool> IsSeekIndicatorEnabledProperty =
+        AvaloniaProperty.Register<LyricView, bool>(nameof(IsSeekIndicatorEnabled), true);
+
+    public static readonly StyledProperty<ICommand?> SeekCommandProperty =
+        AvaloniaProperty.Register<LyricView, ICommand?>(nameof(SeekCommand));
+
     public new static readonly StyledProperty<FontFamily> FontFamilyProperty =
         TextBlock.FontFamilyProperty.AddOwner<LyricView>();
 
@@ -141,11 +155,15 @@ public class LyricView : ItemsControl
     private readonly Dictionary<int, double> _knownHeights = new();
     private readonly Dictionary<Control, SpringState> _springStates = new();
     private readonly DispatcherTimer _userScrollResetTimer;
+    private Canvas? _seekIndicatorLayer;
+    private Border? _seekIndicatorLine;
+    private Border? _seekIndicatorPanel;
+    private Button? _seekIndicatorButton;
+    private TextBlock? _seekIndicatorTextBlock;
     private int _activeIndex = -1;
     private LyricLine? _activeLine;
     private bool _animationFrameQueued;
     private INotifyCollectionChanged? _collectionChangedSource;
-    private bool _deferredActiveItemUpdate;
     private bool _hasLastFrameTimestamp;
     private bool _isApplyingPreset;
     private bool _isFirstLayoutPass = true;
@@ -164,6 +182,7 @@ public class LyricView : ItemsControl
     private long _positionAnchorTimestamp;
     private bool _positionFrameQueued;
     private TimeSpan _renderPosition;
+    private TimeSpan _seekIndicatorPosition;
 
     public LyricView()
     {
@@ -292,6 +311,18 @@ public class LyricView : ItemsControl
         set => SetValue(ClipModeProperty, value);
     }
 
+    public bool IsSeekIndicatorEnabled
+    {
+        get => GetValue(IsSeekIndicatorEnabledProperty);
+        set => SetValue(IsSeekIndicatorEnabledProperty, value);
+    }
+
+    public ICommand? SeekCommand
+    {
+        get => GetValue(SeekCommandProperty);
+        set => SetValue(SeekCommandProperty, value);
+    }
+
     public new FontFamily FontFamily
     {
         get => GetValue(FontFamilyProperty);
@@ -365,7 +396,27 @@ public class LyricView : ItemsControl
         _animationFrameQueued = false;
         _hasLastFrameTimestamp = false;
         _userScrollResetTimer.Stop();
+        HideSeekIndicator();
         UnhookCollectionChanged();
+    }
+
+    protected override void OnApplyTemplate(TemplateAppliedEventArgs e)
+    {
+        base.OnApplyTemplate(e);
+
+        if (_seekIndicatorButton != null)
+            _seekIndicatorButton.Click -= OnSeekIndicatorButtonClick;
+
+        _seekIndicatorLayer = e.NameScope.Find<Canvas>("PART_SeekIndicatorLayer");
+        _seekIndicatorLine = e.NameScope.Find<Border>("PART_SeekIndicatorLine");
+        _seekIndicatorPanel = e.NameScope.Find<Border>("PART_SeekIndicatorPanel");
+        _seekIndicatorTextBlock = e.NameScope.Find<TextBlock>("PART_SeekIndicatorTime");
+        _seekIndicatorButton = e.NameScope.Find<Button>("PART_SeekIndicatorButton");
+
+        if (_seekIndicatorButton != null)
+            _seekIndicatorButton.Click += OnSeekIndicatorButtonClick;
+
+        HideSeekIndicator();
     }
 
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
@@ -400,7 +451,6 @@ public class LyricView : ItemsControl
             var activeLineChanged = SyncActiveLine();
             if (_isUserScrolling)
             {
-                _deferredActiveItemUpdate = true;
                 EnsurePositionClockRunning();
                 return;
             }
@@ -453,6 +503,16 @@ public class LyricView : ItemsControl
         {
             if (IsActive)
                 QueueLayoutUpdate();
+            return;
+        }
+
+        if (change.Property == IsSeekIndicatorEnabledProperty ||
+            change.Property == SeekCommandProperty)
+        {
+            if (!IsSeekIndicatorEnabled)
+                HideSeekIndicator();
+            else
+                UpdateSeekIndicatorButtonState();
             return;
         }
 
@@ -544,8 +604,9 @@ public class LyricView : ItemsControl
 
         _isUserScrolling = true;
         _isManualOffsetReturning = false;
+        ShowSeekIndicator();
 
-        var wheelOffset = e.Delta.Y * 80d;
+        var wheelOffset = e.Delta.Y * WheelScrollStep;
         _manualOffset += wheelOffset;
         _manualOffsetTarget = _manualOffset;
         _manualOffsetVelocity = wheelOffset * 0.35d;
@@ -645,9 +706,7 @@ public class LyricView : ItemsControl
 
     private void OnUserScrollTimeout(object? sender, EventArgs e)
     {
-        _userScrollResetTimer.Stop();
-        _isUserScrolling = false;
-        _lockedActiveIndex = null;
+        EndUserScroll(resetManualOffset: false);
         _manualOffsetTarget = 0d;
 
         if (EnableAnimation)
@@ -660,9 +719,6 @@ public class LyricView : ItemsControl
             _manualOffsetVelocity = 0d;
             _isManualOffsetReturning = false;
         }
-
-        if (_deferredActiveItemUpdate)
-            _deferredActiveItemUpdate = false;
 
         if (IsActive)
             QueueLayoutUpdate();
@@ -759,8 +815,11 @@ public class LyricView : ItemsControl
         }
 
         var centerY = Bounds.Height * Math.Clamp(ActiveAnchorRatio, 0d, 1d) + _manualOffset;
+        var seekAnchorY = Bounds.Height * Math.Clamp(ActiveAnchorRatio, 0d, 1d);
         var activeNaturalCenter = _lineCenters[activeIndex];
         _activeContainers.Clear();
+        var seekLineIndex = -1;
+        var seekLineDistance = double.MaxValue;
 
         for (var i = 0; i < ItemCount; i++)
         {
@@ -774,6 +833,14 @@ public class LyricView : ItemsControl
             Canvas.SetLeft(container, 0d);
             Canvas.SetTop(container, 0d);
             container.Width = Bounds.Width;
+
+            var targetCenter = targetTop + height / 2d;
+            var distanceToSeekAnchor = Math.Abs(targetCenter - seekAnchorY);
+            if (distanceToSeekAnchor < seekLineDistance)
+            {
+                seekLineDistance = distanceToSeekAnchor;
+                seekLineIndex = i;
+            }
 
             var distance = Math.Abs(i - activeIndex);
             double targetOpacity;
@@ -797,7 +864,107 @@ public class LyricView : ItemsControl
 
         TrimStaleStates(_activeContainers);
         _isFirstLayoutPass = false;
+        UpdateSeekIndicator(seekLineIndex, seekAnchorY);
         EnsureAnimationFrameRunning();
+    }
+
+    private void ShowSeekIndicator()
+    {
+        if (!IsSeekIndicatorEnabled || _seekIndicatorLayer == null)
+            return;
+
+        _seekIndicatorLayer.IsVisible = true;
+        if (_seekIndicatorLine != null)
+            _seekIndicatorLine.IsVisible = true;
+        if (_seekIndicatorPanel != null)
+            _seekIndicatorPanel.IsVisible = true;
+    }
+
+    private void HideSeekIndicator()
+    {
+        if (_seekIndicatorLayer != null)
+            _seekIndicatorLayer.IsVisible = false;
+        if (_seekIndicatorLine != null)
+            _seekIndicatorLine.IsVisible = false;
+        if (_seekIndicatorPanel != null)
+            _seekIndicatorPanel.IsVisible = false;
+    }
+
+    private void UpdateSeekIndicator(int lineIndex, double anchorY)
+    {
+        if (!IsSeekIndicatorEnabled || !_isUserScrolling || lineIndex < 0 || lineIndex >= _linesSnapshot.Count)
+            return;
+
+        var line = _linesSnapshot[lineIndex];
+        _seekIndicatorPosition = line.Start;
+
+        if (_seekIndicatorTextBlock != null)
+            _seekIndicatorTextBlock.Text = FormatTime(line.Start);
+
+        var panelLeft = Math.Max(0d, Bounds.Width - SeekIndicatorPanelWidth - SeekIndicatorRightMargin);
+        var panelTop = Math.Clamp(anchorY - SeekIndicatorPanelHeight / 2d, 0d,
+            Math.Max(0d, Bounds.Height - SeekIndicatorPanelHeight));
+        var lineLeft = Math.Max(0d, panelLeft - SeekIndicatorLineWidth - SeekIndicatorGap);
+        var lineTop = Math.Clamp(anchorY - 0.5d, 0d, Math.Max(0d, Bounds.Height - 1d));
+
+        if (_seekIndicatorPanel != null)
+        {
+            Canvas.SetLeft(_seekIndicatorPanel, panelLeft);
+            Canvas.SetTop(_seekIndicatorPanel, panelTop);
+        }
+
+        if (_seekIndicatorLine != null)
+        {
+            _seekIndicatorLine.Width = Math.Max(0d, panelLeft - lineLeft - SeekIndicatorGap);
+            Canvas.SetLeft(_seekIndicatorLine, lineLeft);
+            Canvas.SetTop(_seekIndicatorLine, lineTop);
+        }
+
+        ShowSeekIndicator();
+        UpdateSeekIndicatorButtonState();
+    }
+
+    private void UpdateSeekIndicatorButtonState()
+    {
+        if (_seekIndicatorButton == null)
+            return;
+
+        var command = SeekCommand;
+        _seekIndicatorButton.IsEnabled = command?.CanExecute(_seekIndicatorPosition) == true;
+    }
+
+    private void OnSeekIndicatorButtonClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        var command = SeekCommand;
+        if (command?.CanExecute(_seekIndicatorPosition) == true)
+            command.Execute(_seekIndicatorPosition);
+
+        EndUserScroll(resetManualOffset: true);
+        e.Handled = true;
+    }
+
+    private void EndUserScroll(bool resetManualOffset)
+    {
+        _userScrollResetTimer.Stop();
+        _isUserScrolling = false;
+        _lockedActiveIndex = null;
+        HideSeekIndicator();
+
+        if (resetManualOffset)
+        {
+            _manualOffset = 0d;
+            _manualOffsetTarget = 0d;
+            _manualOffsetVelocity = 0d;
+            _isManualOffsetReturning = false;
+        }
+    }
+
+    private static string FormatTime(TimeSpan value)
+    {
+        var totalSeconds = Math.Max(0, (int)Math.Floor(value.TotalSeconds));
+        var minutes = totalSeconds / 60;
+        var seconds = totalSeconds % 60;
+        return $"{minutes:00}:{seconds:00}";
     }
 
     private void EnsureLayoutBuffers(int itemCount)
@@ -1046,8 +1213,6 @@ public class LyricView : ItemsControl
         var activeLineChanged = SyncActiveLine();
         if (activeLineChanged && !_isUserScrolling)
             QueueLayoutUpdate();
-        else if (_isUserScrolling)
-            _deferredActiveItemUpdate = true;
 
         EnsurePositionClockRunning();
     }
