@@ -369,15 +369,6 @@ public partial class PlayerViewModel
         };
     }
 
-    private static AvaloniaList<AudioVisualizerBarViewModel> CreateVisualizerBars()
-    {
-        var bars = new AvaloniaList<AudioVisualizerBarViewModel>();
-        for (var i = 0; i < VisualizerBarCount; i++)
-            bars.Add(new AudioVisualizerBarViewModel());
-
-        return bars;
-    }
-
     private async Task RefreshCurrentTrackNormalizationAsync()
     {
         var currentSong = CurrentPlayingSong;
@@ -430,11 +421,12 @@ public partial class PlayerViewModel
 
     private void ResetVisualizerBars()
     {
-        for (var i = 0; i < NowPlayingVisualizerBars.Count; i++)
+        for (var i = 0; i < NowPlayingVisualizerBars.Length; i++)
         {
             NowPlayingVisualizerBars[i].Height = VisualizerMinHeight;
             NowPlayingVisualizerBars[i].Opacity = 0.1;
         }
+        VisualizerUpdated?.Invoke(); // 通知控件重绘
     }
 
     private void UpdateNowPlayingVisualizer(AudioAnalysisSnapshot snapshot)
@@ -448,7 +440,7 @@ public partial class PlayerViewModel
 
         var energyBoost = Math.Clamp(snapshot.Rms * 8.5, 0d, 1d);
         var brightnessBoost = Math.Clamp(snapshot.Brightness * 1.25, 0d, 1d);
-        var barCount = NowPlayingVisualizerBars.Count;
+        var barCount = NowPlayingVisualizerBars.Length; 
 
         for (var i = 0; i < barCount; i++)
         {
@@ -462,12 +454,14 @@ public partial class PlayerViewModel
                 0d,
                 1d);
             var targetHeight = VisualizerMinHeight + target * VisualizerHeightRange;
-            var bar = NowPlayingVisualizerBars[i];
-
+            
+            ref var bar = ref NowPlayingVisualizerBars[i];
+    
             var smoothing = targetHeight >= bar.Height ? 0.46d : 0.16d;
             bar.Height += (targetHeight - bar.Height) * smoothing;
             bar.Opacity = Math.Clamp(0.1d + Math.Pow(target, 0.9d) * 0.5d, 0.1d, 0.6d);
         }
+        VisualizerUpdated?.Invoke();
     }
 
     private static double SampleSpectrumBand(IReadOnlyList<float> spectrumBands, double phase)

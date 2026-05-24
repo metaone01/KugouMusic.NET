@@ -195,7 +195,8 @@ public partial class PlayerViewModel : ViewModelBase, IDisposable
     public AvaloniaList<SongItem> DisplayPlaybackQueue { get; } = new();
     public AvaloniaList<LyricLineViewModel> LyricLines => _lyricsService.LyricLines;
     public AvaloniaList<LyricLine> RenderLyricLines => _lyricsService.RenderLyricLines;
-    public AvaloniaList<AudioVisualizerBarViewModel> NowPlayingVisualizerBars { get; } = CreateVisualizerBars();
+    public VisualizerBandState[] NowPlayingVisualizerBars { get; } = new VisualizerBandState[VisualizerBarCount];
+    public event Action? VisualizerUpdated;
     public string[] QualityOptions { get; } = ["128", "320", "flac", "high"];
     public int DisplayPlaybackQueueCount => DisplayPlaybackQueue.Count;
     public bool HasDisplayPlaybackQueue => DisplayPlaybackQueue.Count > 0;
