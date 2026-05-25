@@ -98,6 +98,9 @@ public class LyricLineControl : UserControl
     private TimeSpan _renderPosition;
     private bool _isApplyingPreset;
 
+    private const FontWeight DefaultFontWeight = FontWeight.ExtraBold;
+    private const double TranslationStaticOpacity = 0.82d;
+
     public LyricLineControl()
     {
         _primaryTextBlock = CreateTextBlock();
@@ -396,8 +399,8 @@ public class LyricLineControl : UserControl
         _primaryWordPanel.HorizontalContentAlignment = horizontalAlignment;
         _translationWordPanel.HorizontalContentAlignment = horizontalAlignment;
 
-        ApplyTextBlockStyle(_primaryTextBlock, PrimaryFontSize, PrimaryForeground, isActive, InactivePrimaryOpacity, FontWeight.ExtraLight, FontWeight.ExtraLight);
-        ApplyTextBlockStyle(_translationTextBlock, TranslationFontSize, TranslationForeground, isActive, InactiveSecondaryOpacity, FontWeight.Medium, FontWeight.Medium);
+        ApplyTextBlockStyle(_primaryTextBlock, PrimaryFontSize, PrimaryForeground, isActive, InactivePrimaryOpacity, DefaultFontWeight, DefaultFontWeight);
+        ApplyTextBlockStyle(_translationTextBlock, TranslationFontSize, TranslationForeground, false, TranslationStaticOpacity, FontWeight.Medium, FontWeight.Medium);
         ApplyTextBlockStyle(_romanizationTextBlock, RomanizationFontSize, RomanizationForeground, isActive, InactiveSecondaryOpacity, FontWeight.Medium, FontWeight.Medium);
 
         _primaryTextBlock.Text = line?.Text ?? string.Empty;
@@ -410,16 +413,16 @@ public class LyricLineControl : UserControl
         if (rebuildWords)
         {
             RebuildWordVisuals(_primaryWordPanel, _primaryWordVisuals, line?.Words, PrimaryFontSize, PrimaryForeground, PrimaryPlayedForeground);
-            RebuildWordVisuals(_translationWordPanel, _translationWordVisuals, line?.TranslationWords, TranslationFontSize, TranslationForeground, TranslationPlayedForeground);
+            _translationWordPanel.Children.Clear();
+            _translationWordVisuals.Clear();
         }
 
         var showPrimaryWords = ShowPrimaryText && line is { Words.Count: > 0 } && WordRenderMode != LyricWordRenderMode.Plain;
         _primaryWordPanel.IsVisible = showPrimaryWords;
         _primaryTextBlock.IsVisible = ShowPrimaryText && !showPrimaryWords && !string.IsNullOrWhiteSpace(line?.Text);
 
-        var showTranslationWords = ShowTranslation && line is { TranslationWords.Count: > 0 } && WordRenderMode != LyricWordRenderMode.Plain;
-        _translationWordPanel.IsVisible = showTranslationWords;
-        _translationTextBlock.IsVisible = ShowTranslation && !showTranslationWords && !string.IsNullOrWhiteSpace(line?.Translation);
+        _translationWordPanel.IsVisible = false;
+        _translationTextBlock.IsVisible = ShowTranslation && !string.IsNullOrWhiteSpace(line?.Translation);
         _romanizationTextBlock.IsVisible = ShowRomanization && !string.IsNullOrWhiteSpace(line?.Romanization);
 
         RefreshWordProgress();
@@ -430,7 +433,6 @@ public class LyricLineControl : UserControl
         var line = Line;
         var isActive = ReferenceEquals(line, ActiveLine);
         RefreshWordVisuals(_primaryWordVisuals, _renderPosition, isActive, PrimaryForeground, PrimaryPlayedForeground, 0.34d, WordRenderMode == LyricWordRenderMode.LegacyLift);
-        RefreshWordVisuals(_translationWordVisuals, _renderPosition, isActive, TranslationForeground, TranslationPlayedForeground, 0.4d, WordRenderMode == LyricWordRenderMode.LegacyLift);
     }
 
     private void SyncPositionAnchor()
@@ -453,7 +455,7 @@ public class LyricLineControl : UserControl
         return IsPositionClockRunning &&
                IsVisible &&
                ReferenceEquals(Line, ActiveLine) &&
-               (_primaryWordVisuals.Count > 0 || _translationWordVisuals.Count > 0) &&
+               _primaryWordVisuals.Count > 0 &&
                TopLevel.GetTopLevel(this) != null;
     }
 
@@ -530,7 +532,7 @@ public class LyricLineControl : UserControl
             Text = word.Text,
             FontFamily = FontFamily,
             FontSize = fontSize,
-            FontWeight = FontWeight.ExtraLight,
+            FontWeight = DefaultFontWeight,
             Foreground = foreground,
             PlayedForeground = playedForeground,
             ClipMode = ClipMode,
@@ -548,7 +550,7 @@ public class LyricLineControl : UserControl
             Text = word.Text,
             FontFamily = FontFamily,
             FontSize = fontSize,
-            FontWeight = FontWeight.ExtraLight,
+            FontWeight = DefaultFontWeight,
             Foreground = foreground,
             RenderTransform = transform
         };
@@ -593,7 +595,7 @@ public class LyricLineControl : UserControl
                             : isPlayed
                                 ? 0.96d
                                 : unplayedOpacity;
-                    textBlock.FontWeight = FontWeight.ExtraLight;
+                    textBlock.FontWeight = DefaultFontWeight;
                     visual.Transform?.Y = enableLift ? LyricProgressCalculator.GetLiftOffset(progress) : 0d;
                     break;
             }

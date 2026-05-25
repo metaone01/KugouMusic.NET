@@ -78,7 +78,7 @@
                     <StackPanel Grid.Row="1" IsVisible="{Binding !IsLoadingHot}" Spacing="20" >
                         <TextBlock Text="大家都在搜"
                                    FontSize="18"
-                                   FontWeight="Bold"
+                                   FontWeight="ExtraBold"
                                    Foreground="{DynamicResource SukiText}" />
                         
                         <ScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled">

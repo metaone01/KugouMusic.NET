@@ -91,7 +91,7 @@
                 <StackPanel Spacing="12" Margin="2,0,4,96">
                     <TextBlock Text="设置"
                                FontSize="22"
-                               FontWeight="Bold"
+                               FontWeight="ExtraBold"
                                Foreground="{DynamicResource SukiText}" />
 
                     <suki:GlassCard IsOpaque="True" Padding="14" IsVisible="{Binding IsGeneralSection}">

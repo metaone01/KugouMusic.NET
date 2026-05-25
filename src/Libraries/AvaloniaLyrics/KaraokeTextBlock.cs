@@ -296,7 +296,7 @@ public class KaraokeTextBlock : Control
             return playedBrush;
 
         var color = solid.Color;
-        var leading = Color.FromArgb((byte)Math.Round(color.A * 0.78), color.R, color.G, color.B);
+        var leading = Color.FromArgb((byte)Math.Round(color.A * 0.96), color.R, color.G, color.B);
         return new LinearGradientBrush
         {
             StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative),
@@ -304,7 +304,7 @@ public class KaraokeTextBlock : Control
             GradientStops =
             {
                 new GradientStop(leading, 0),
-                new GradientStop(color, 0.35),
+                new GradientStop(color, 0.18),
                 new GradientStop(color, 1)
             }
         };
