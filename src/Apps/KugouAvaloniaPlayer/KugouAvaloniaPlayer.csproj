@@ -31,6 +31,14 @@
     <ItemGroup>
         <AvaloniaResource Include="Assets\**"/>
         <TrimmerRootAssembly Include="TagLibSharp"/>
+        
+        <TrimmerRootAssembly Include="Microsoft.EntityFrameworkCore" />
+        <TrimmerRootAssembly Include="Microsoft.EntityFrameworkCore.Relational" />
+        <TrimmerRootAssembly Include="Microsoft.EntityFrameworkCore.Sqlite" />
+        <TrimmerRootAssembly Include="Microsoft.Data.Sqlite" />
+        <TrimmerRootAssembly Include="SQLitePCLRaw.core" />
+        <TrimmerRootAssembly Include="SQLitePCLRaw.bundle_e_sqlite3" />
+        <TrimmerRootAssembly Include="SQLitePCLRaw.provider.e_sqlite3" />
     </ItemGroup>
 
     <ItemGroup>
