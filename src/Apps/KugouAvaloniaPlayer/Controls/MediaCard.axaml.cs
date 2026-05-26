@@ -1,6 +1,10 @@
+using System;
 using System.Windows.Input;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Interactivity;
+using Avalonia.VisualTree;
 
 namespace KugouAvaloniaPlayer.Controls;
 
@@ -29,6 +33,8 @@ public partial class MediaCard : UserControl
 
     public new static readonly StyledProperty<ContextMenu?> ContextMenuProperty =
         AvaloniaProperty.Register<MediaCard, ContextMenu?>(nameof(ContextMenu));
+
+    private TopLevel? _lightDismissTopLevel;
 
     public MediaCard()
     {
@@ -88,5 +94,76 @@ public partial class MediaCard : UserControl
         base.OnPropertyChanged(change);
 
         if (change.Property == SubtitleProperty) HasSubtitle = !string.IsNullOrEmpty(change.NewValue as string);
+        if (change.Property == ContextMenuProperty)
+        {
+            if (change.OldValue is ContextMenu oldMenu)
+                DetachContextMenuHandlers(oldMenu);
+
+            if (change.NewValue is ContextMenu newMenu)
+                AttachContextMenuHandlers(newMenu);
+        }
+    }
+
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        if (ContextMenu != null)
+            DetachContextMenuHandlers(ContextMenu);
+
+        DetachLightDismissHandler();
+        base.OnDetachedFromVisualTree(e);
+    }
+
+    private void AttachContextMenuHandlers(ContextMenu menu)
+    {
+        menu.Opening -= ContextMenu_OnOpening;
+        menu.Closing -= ContextMenu_OnClosing;
+        menu.Opening += ContextMenu_OnOpening;
+        menu.Closing += ContextMenu_OnClosing;
+    }
+
+    private void DetachContextMenuHandlers(ContextMenu menu)
+    {
+        menu.Opening -= ContextMenu_OnOpening;
+        menu.Closing -= ContextMenu_OnClosing;
+    }
+
+    private void ContextMenu_OnOpening(object? sender, EventArgs e)
+    {
+        AttachLightDismissHandler();
+    }
+
+    private void ContextMenu_OnClosing(object? sender, EventArgs e)
+    {
+        DetachLightDismissHandler();
+    }
+
+    private void AttachLightDismissHandler()
+    {
+        var topLevel = TopLevel.GetTopLevel(this);
+        if (topLevel == null || ReferenceEquals(_lightDismissTopLevel, topLevel))
+            return;
+
+        DetachLightDismissHandler();
+
+        _lightDismissTopLevel = topLevel;
+        topLevel.AddHandler(
+            PointerPressedEvent,
+            OnTopLevelPointerPressed,
+            RoutingStrategies.Tunnel,
+            handledEventsToo: true);
+    }
+
+    private void DetachLightDismissHandler()
+    {
+        _lightDismissTopLevel?.RemoveHandler(
+            PointerPressedEvent,
+            OnTopLevelPointerPressed);
+        _lightDismissTopLevel = null;
+    }
+
+    private void OnTopLevelPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        ContextMenu?.Close();
+        DetachLightDismissHandler();
     }
 }

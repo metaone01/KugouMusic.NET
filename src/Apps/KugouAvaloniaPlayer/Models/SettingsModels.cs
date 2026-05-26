@@ -121,6 +121,8 @@ public class AppSettings
     public string MusicQuality { get; set; } = "128";
     public List<string> LocalMusicFolders { get; set; } = new();
     public Dictionary<string, LocalPlaylistMeta> LocalPlaylistMetas { get; set; } = new();
+    public Dictionary<string, JellyfinServerSettings> JellyfinServers { get; set; } = new();
+    public string? LastJellyfinServerFingerprint { get; set; }
     public bool AutoCheckUpdate { get; set; } = true;
     public bool UseCustomBackgroundImage { get; set; }
     public string? CustomBackgroundImagePath { get; set; }
@@ -173,4 +175,11 @@ public class LocalPlaylistMeta
     public string? Name { get; set; }
     public string? CoverPath { get; set; }
     public Dictionary<string, string> SongCoverPaths { get; set; } = new();
+}
+
+public class JellyfinServerSettings
+{
+    public string ServerUrl { get; set; } = string.Empty;
+    public string UserId { get; set; } = string.Empty;
+    public string ApiKey { get; set; } = string.Empty;
 }

@@ -193,6 +193,8 @@ public sealed class PlaybackHistoryService(
             Cover = song.Cover,
             DurationSeconds = song.DurationSeconds,
             LocalFilePath = song.LocalFilePath,
+            LocalSourceType = song.LocalSourceType,
+            RemoteUrl = song.RemoteUrl,
             PlaybackSource = song.PlaybackSource,
             PlayedAt = DateTimeOffset.Now.ToString("O")
         };
@@ -215,6 +217,8 @@ public sealed class PlaybackHistoryService(
                 : item.Cover,
             DurationSeconds = item.DurationSeconds,
             LocalFilePath = item.LocalFilePath,
+            LocalSourceType = item.LocalSourceType,
+            RemoteUrl = item.RemoteUrl,
             PlaybackSource = item.PlaybackSource
         };
     }
@@ -252,6 +256,8 @@ public sealed class PlaybackHistoryItem
     public string? Cover { get; set; }
     public double DurationSeconds { get; set; }
     public string? LocalFilePath { get; set; }
+    public string? LocalSourceType { get; set; }
+    public string? RemoteUrl { get; set; }
     public SongPlaybackSource PlaybackSource { get; set; } = SongPlaybackSource.Default;
     public string PlayedAt { get; set; } = "";
 }

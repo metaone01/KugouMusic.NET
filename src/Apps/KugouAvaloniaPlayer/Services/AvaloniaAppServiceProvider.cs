@@ -11,6 +11,7 @@ using KuGou.Net.Protocol.Raw;
 using KuGou.Net.Protocol.Session;
 using KugouAvaloniaPlayer.Services.DesktopLyric;
 using KugouAvaloniaPlayer.Services.GlobalShortcutService;
+using KugouAvaloniaPlayer.Services.Jellyfin;
 using KugouAvaloniaPlayer.Services.SystemMediaSession;
 using KugouAvaloniaPlayer.ViewModels;
 using Microsoft.Extensions.Logging;
@@ -39,6 +40,7 @@ namespace KugouAvaloniaPlayer.Services;
 [Singleton<IGlobalShortcutService, GlobalShortcutServiceImpl>]
 [Singleton<ISystemMediaSessionService, SystemMediaSessionServiceImpl>]
 [Singleton<IFolderPickerService, FolderPickerService>]
+[Singleton<IJellyfinClient, JellyfinClient>]
 [Singleton<ILocalMusicLibraryService, LocalMusicLibraryService>]
 [Singleton<IGitHubReleaseService, GitHubReleaseService>]
 [Singleton<IAppUpdateService, AppUpdateService>]
@@ -112,6 +114,7 @@ public interface IAvaloniaAppServiceModule;
 [Singleton<ILogger<PersonalFmService>>(Factory = nameof(CreatePersonalFmServiceLogger))]
 [Singleton<ILogger<PlaybackHistoryService>>(Factory = nameof(CreatePlaybackHistoryServiceLogger))]
 [Singleton<ILogger<SystemMediaSessionServiceImpl>>(Factory = nameof(CreateSystemMediaSessionServiceLogger))]
+[Singleton<ILogger<JellyfinClient>>(Factory = nameof(CreateJellyfinClientLogger))]
 [Singleton<ILogger<LocalMusicLibraryService>>(Factory = nameof(CreateLocalMusicLibraryServiceLogger))]
 public sealed partial class AvaloniaAppServiceProvider
 {
@@ -171,5 +174,6 @@ public sealed partial class AvaloniaAppServiceProvider
     public ILogger<PersonalFmService> CreatePersonalFmServiceLogger() => LoggerFactory.CreateLogger<PersonalFmService>();
     public ILogger<PlaybackHistoryService> CreatePlaybackHistoryServiceLogger() => LoggerFactory.CreateLogger<PlaybackHistoryService>();
     public ILogger<SystemMediaSessionServiceImpl> CreateSystemMediaSessionServiceLogger() => LoggerFactory.CreateLogger<SystemMediaSessionServiceImpl>();
+    public ILogger<JellyfinClient> CreateJellyfinClientLogger() => LoggerFactory.CreateLogger<JellyfinClient>();
     public ILogger<LocalMusicLibraryService> CreateLocalMusicLibraryServiceLogger() => LoggerFactory.CreateLogger<LocalMusicLibraryService>();
 }

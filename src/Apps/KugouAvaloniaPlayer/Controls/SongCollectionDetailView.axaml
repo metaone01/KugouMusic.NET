@@ -110,6 +110,7 @@
                     Background="{DynamicResource SukiPrimaryColorLow}">
                 <Grid>
                     <Image asyncImageLoader:ImageLoader.Source="{Binding #Root.CurrentHeroBackground}"
+                           behaviors:ImageRenderOptions.InterpolationSource="{Binding #Root.CurrentHeroBackground}"
                            IsVisible="{DynamicResource KugouHeroBackgroundImageVisible}"
                            Stretch="UniformToFill" />
                     <Border>
@@ -148,8 +149,11 @@
                         BorderThickness="2"
                         Background="{DynamicResource CollectionCoverBackgroundBrush}">
                     <Image asyncImageLoader:ImageLoader.Source="{Binding #Root.Cover}"
+                           behaviors:ImageRenderOptions.InterpolationSource="{Binding #Root.Cover}"
+                           Width="164"
+                           Height="164"
                            Stretch="UniformToFill"
-                           RenderOptions.BitmapInterpolationMode="HighQuality" />
+                           />
                 </Border>
 
                 <Grid Grid.Column="1"

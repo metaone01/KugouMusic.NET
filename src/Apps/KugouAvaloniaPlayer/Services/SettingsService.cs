@@ -12,7 +12,9 @@ namespace KugouAvaloniaPlayer.Services;
 [JsonSerializable(typeof(LyricAlignmentOption))]
 [JsonSerializable(typeof(NowPlayingLyricDisplayMode))]
 [JsonSerializable(typeof(LocalPlaylistMeta))]
+[JsonSerializable(typeof(JellyfinServerSettings))]
 [JsonSerializable(typeof(Dictionary<string, LocalPlaylistMeta>))]
+[JsonSerializable(typeof(Dictionary<string, JellyfinServerSettings>))]
 [JsonSerializable(typeof(Dictionary<string, string>))]
 [JsonSerializable(typeof(AppSettings))]
 internal partial class AppSettingsJsonContext : JsonSerializerContext
@@ -93,10 +95,14 @@ public static class SettingsManager
         {
             var localFolders = Settings.LocalMusicFolders;
             var localMetas = Settings.LocalPlaylistMetas;
+            var jellyfinServers = Settings.JellyfinServers;
+            var lastJellyfinServerFingerprint = Settings.LastJellyfinServerFingerprint;
             Settings = new AppSettings
             {
                 LocalMusicFolders = localFolders,
-                LocalPlaylistMetas = localMetas
+                LocalPlaylistMetas = localMetas,
+                JellyfinServers = jellyfinServers,
+                LastJellyfinServerFingerprint = lastJellyfinServerFingerprint
             };
             Save();
         }
@@ -109,6 +115,7 @@ public static class SettingsManager
     {
         Settings.LocalMusicFolders ??= new List<string>();
         Settings.LocalPlaylistMetas ??= new Dictionary<string, LocalPlaylistMeta>();
+        Settings.JellyfinServers ??= new Dictionary<string, JellyfinServerSettings>();
         Settings.GlobalShortcuts ??= new GlobalShortcutSettings();
         Settings.AppTheme = NormalizeAppTheme(Settings.AppTheme);
         Settings.CustomBackgroundImagePath = string.IsNullOrWhiteSpace(Settings.CustomBackgroundImagePath)

@@ -58,6 +58,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 album TEXT NOT NULL,
                 duration_seconds REAL NOT NULL,
                 cover_path TEXT NULL,
+                remote_url TEXT NULL,
                 file_size INTEGER NOT NULL,
                 last_write_time_utc TEXT NOT NULL,
                 created_at TEXT NOT NULL,
@@ -113,6 +114,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         track.Property(x => x.Album).HasColumnName("album").IsRequired();
         track.Property(x => x.DurationSeconds).HasColumnName("duration_seconds");
         track.Property(x => x.CoverPath).HasColumnName("cover_path");
+        track.Property(x => x.RemoteUrl).HasColumnName("remote_url");
         track.Property(x => x.FileSize).HasColumnName("file_size");
         track.Property(x => x.LastWriteTimeUtc).HasColumnName("last_write_time_utc").IsRequired();
         track.Property(x => x.CreatedAtUtc).HasColumnName("created_at").IsRequired();
@@ -167,6 +169,7 @@ public sealed class LocalTrackEntity
     public string Album { get; set; } = "";
     public double DurationSeconds { get; set; }
     public string? CoverPath { get; set; }
+    public string? RemoteUrl { get; set; }
     public long FileSize { get; set; }
     public DateTime LastWriteTimeUtc { get; set; }
     public DateTime CreatedAtUtc { get; set; }

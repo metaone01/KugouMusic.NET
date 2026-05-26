@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using KugouAvaloniaPlayer.Models;
+using KugouAvaloniaPlayer.Services.Jellyfin;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using TagLib;
@@ -21,6 +22,11 @@ public interface ILocalMusicLibraryService
     Task<IReadOnlyList<LocalTrackItem>> GetPlaylistTracksAsync(long playlistId, CancellationToken cancellationToken = default);
     Task<LocalPlaylistSummary> CreatePlaylistAsync(string name, CancellationToken cancellationToken = default);
     Task<LocalPlaylistSummary> ImportFolderAsync(string folderPath, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<LocalPlaylistSummary>> ImportJellyfinLibraryAsync(
+        JellyfinConnectionOptions options,
+        JellyfinLibrary library,
+        IProgress<JellyfinImportProgress>? progress = null,
+        CancellationToken cancellationToken = default);
     Task AddFilesToPlaylistAsync(long playlistId, IEnumerable<string> filePaths, CancellationToken cancellationToken = default);
     Task UpdatePlaylistAsync(long playlistId, string name, string? coverPath, CancellationToken cancellationToken = default);
     Task DeletePlaylistAsync(long playlistId, CancellationToken cancellationToken = default);
@@ -40,14 +46,20 @@ public sealed record LocalTrackItem(
     string Artist,
     string Album,
     double DurationSeconds,
+    string SourceType,
     string LocalPath,
-    string? CoverPath);
+    string? CoverPath,
+    string? RemoteUrl);
 
-public sealed class LocalMusicLibraryService(ILogger<LocalMusicLibraryService> logger) : ILocalMusicLibraryService
+public sealed class LocalMusicLibraryService(
+    IJellyfinClient jellyfinClient,
+    ILogger<LocalMusicLibraryService> logger) : ILocalMusicLibraryService
 {
     private const string PlaylistKindManual = "Manual";
     private const string PlaylistKindImportedFolder = "ImportedFolder";
+    private const string PlaylistKindJellyfinLibrary = "JellyfinLibrary";
     private const string SourceTypeLocalFile = "LocalFile";
+    public const string SourceTypeJellyfin = "Jellyfin";
 
     private static readonly string LocalSongCoverCacheDirectory = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -124,8 +136,10 @@ public sealed class LocalMusicLibraryService(ILogger<LocalMusicLibraryService> l
                 x.Track.Artist,
                 x.Track.Album,
                 x.Track.DurationSeconds,
+                x.Track.SourceType,
                 x.Track.LocalPath,
-                x.Track.CoverPath))
+                x.Track.CoverPath,
+                x.Track.RemoteUrl))
             .ToListAsync(cancellationToken);
     }
 
@@ -144,6 +158,109 @@ public sealed class LocalMusicLibraryService(ILogger<LocalMusicLibraryService> l
         db.LocalPlaylists.Add(playlist);
         await db.SaveChangesAsync(cancellationToken);
         return await GetPlaylistSummaryAsync(db, playlist.Id, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<LocalPlaylistSummary>> ImportJellyfinLibraryAsync(
+        JellyfinConnectionOptions options,
+        JellyfinLibrary library,
+        IProgress<JellyfinImportProgress>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        await EnsureInitializedAsync(cancellationToken);
+
+        var serverFingerprint = jellyfinClient.GetServerFingerprint(options.ServerUrl);
+        var audioItems = await jellyfinClient.GetAudioItemsAsync(options, library.Id, progress, cancellationToken);
+        var albumGroups = audioItems
+            .GroupBy(x => GetJellyfinAlbumKey(x))
+            .Select(x => new JellyfinAlbumGroup(
+                x.Key,
+                GetJellyfinAlbumName(x.First()),
+                x.ToList()))
+            .OrderBy(x => x.Name, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+
+        await using var db = AppDbContext.Create();
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+
+        var legacyLibrarySourceRef = $"{serverFingerprint}:{library.Id}";
+        var legacyLibraryPlaylist = await db.LocalPlaylists
+            .FirstOrDefaultAsync(
+                x => x.Kind == PlaylistKindJellyfinLibrary && x.SourceRef == legacyLibrarySourceRef,
+                cancellationToken);
+        if (legacyLibraryPlaylist != null)
+        {
+            db.LocalPlaylists.Remove(legacyLibraryPlaylist);
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
+        var importedPlaylistIds = new List<long>();
+        var processedSongs = 0;
+        foreach (var albumGroup in albumGroups)
+        {
+            var sourceRef = $"{serverFingerprint}:{library.Id}:{albumGroup.Key}";
+            var playlist = await db.LocalPlaylists
+                .Include(x => x.Tracks)
+                .FirstOrDefaultAsync(
+                    x => x.Kind == PlaylistKindJellyfinLibrary && x.SourceRef == sourceRef,
+                    cancellationToken);
+
+            if (playlist == null)
+            {
+                playlist = new LocalPlaylistEntity
+                {
+                    Name = albumGroup.Name,
+                    Kind = PlaylistKindJellyfinLibrary,
+                    SourceRef = sourceRef,
+                    CreatedAtUtc = DateTime.UtcNow,
+                    UpdatedAtUtc = DateTime.UtcNow
+                };
+                db.LocalPlaylists.Add(playlist);
+                await db.SaveChangesAsync(cancellationToken);
+            }
+            else
+            {
+                playlist.Name = albumGroup.Name;
+            }
+
+            var existingLinks = await db.LocalPlaylistTracks
+                .Where(x => x.PlaylistId == playlist.Id)
+                .ToListAsync(cancellationToken);
+            db.LocalPlaylistTracks.RemoveRange(existingLinks);
+            await db.SaveChangesAsync(cancellationToken);
+
+            for (var i = 0; i < albumGroup.Items.Count; i++)
+            {
+                var track = await UpsertJellyfinTrackAsync(db, serverFingerprint, albumGroup.Items[i], cancellationToken);
+                db.LocalPlaylistTracks.Add(new LocalPlaylistTrackEntity
+                {
+                    PlaylistId = playlist.Id,
+                    TrackId = track.Id,
+                    Position = i,
+                    AddedAtUtc = DateTime.UtcNow
+                });
+
+                processedSongs++;
+                progress?.Report(new JellyfinImportProgress
+                {
+                    Processed = processedSongs,
+                    Total = audioItems.Count,
+                    Message = $"正在按专辑写入本地音乐库 {processedSongs}/{audioItems.Count}"
+                });
+            }
+
+            playlist.CoverPath = albumGroup.Items.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x.CoverUrl))?.CoverUrl;
+            playlist.UpdatedAtUtc = DateTime.UtcNow;
+            importedPlaylistIds.Add(playlist.Id);
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+
+        var summaries = new List<LocalPlaylistSummary>();
+        foreach (var playlistId in importedPlaylistIds)
+            summaries.Add(await GetPlaylistSummaryAsync(db, playlistId, cancellationToken));
+
+        return summaries;
     }
 
     public async Task<LocalPlaylistSummary> ImportFolderAsync(string folderPath, CancellationToken cancellationToken = default)
@@ -397,11 +514,63 @@ public sealed class LocalMusicLibraryService(ILogger<LocalMusicLibraryService> l
         track.Album = metadata.Album;
         track.DurationSeconds = metadata.DurationSeconds;
         track.CoverPath = string.IsNullOrWhiteSpace(metadata.CoverPath) ? track.CoverPath : metadata.CoverPath;
+        track.RemoteUrl = null;
         track.FileSize = fileSize;
         track.LastWriteTimeUtc = lastWriteTime;
         track.UpdatedAtUtc = now;
         await db.SaveChangesAsync(cancellationToken);
         return track;
+    }
+
+    private async Task<LocalTrackEntity> UpsertJellyfinTrackAsync(
+        AppDbContext db,
+        string serverFingerprint,
+        JellyfinAudioItem item,
+        CancellationToken cancellationToken)
+    {
+        var pseudoPath = jellyfinClient.BuildPseudoPath(serverFingerprint, item.Id);
+        var now = DateTime.UtcNow;
+        var track = await db.LocalTracks.FirstOrDefaultAsync(x => x.LocalPath == pseudoPath, cancellationToken);
+
+        if (track == null)
+        {
+            track = new LocalTrackEntity
+            {
+                SourceType = SourceTypeJellyfin,
+                LocalPath = pseudoPath,
+                CreatedAtUtc = now
+            };
+            db.LocalTracks.Add(track);
+        }
+
+        track.SourceType = SourceTypeJellyfin;
+        track.Title = string.IsNullOrWhiteSpace(item.Name) ? "未知歌曲" : item.Name;
+        track.Artist = string.IsNullOrWhiteSpace(item.Artist) ? "未知艺术家" : item.Artist;
+        track.Album = item.Album ?? string.Empty;
+        track.DurationSeconds = item.DurationSeconds;
+        track.CoverPath = string.IsNullOrWhiteSpace(item.CoverUrl) ? track.CoverPath : item.CoverUrl;
+        track.RemoteUrl = string.IsNullOrWhiteSpace(item.StreamUrl) ? track.RemoteUrl : item.StreamUrl;
+        track.FileSize = 0;
+        track.LastWriteTimeUtc = now;
+        track.UpdatedAtUtc = now;
+        await db.SaveChangesAsync(cancellationToken);
+        return track;
+    }
+
+    private static string GetJellyfinAlbumKey(JellyfinAudioItem item)
+    {
+        if (!string.IsNullOrWhiteSpace(item.AlbumId))
+            return $"album:{item.AlbumId}";
+
+        if (!string.IsNullOrWhiteSpace(item.Album))
+            return $"name:{GetStableHash(item.Album.Trim().ToUpperInvariant())}";
+
+        return "unknown";
+    }
+
+    private static string GetJellyfinAlbumName(JellyfinAudioItem item)
+    {
+        return string.IsNullOrWhiteSpace(item.Album) ? "未分专辑" : item.Album.Trim();
     }
 
     private static async Task<LocalPlaylistSummary> GetPlaylistSummaryAsync(
@@ -540,4 +709,9 @@ public sealed class LocalMusicLibraryService(ILogger<LocalMusicLibraryService> l
         string Album,
         double DurationSeconds,
         string? CoverPath);
+
+    private sealed record JellyfinAlbumGroup(
+        string Key,
+        string Name,
+        List<JellyfinAudioItem> Items);
 }

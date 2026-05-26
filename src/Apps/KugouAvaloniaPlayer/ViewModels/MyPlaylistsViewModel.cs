@@ -15,6 +15,7 @@ using KuGou.Net.Abstractions.Models;
 using KuGou.Net.Clients;
 using KugouAvaloniaPlayer.Models;
 using KugouAvaloniaPlayer.Services;
+using KugouAvaloniaPlayer.Services.Jellyfin;
 using Microsoft.Extensions.Logging;
 using SukiUI.Toasts;
 
@@ -32,6 +33,7 @@ public partial class MyPlaylistsViewModel : PageViewModelBase
     private readonly IExternalPlaylistImportService _externalPlaylistImportService;
     private readonly FavoritePlaylistService _favoritePlaylistService;
     private readonly IFolderPickerService _folderPickerService;
+    private readonly IJellyfinClient _jellyfinClient;
     private readonly ILocalMusicLibraryService _localMusicLibraryService;
     private readonly ILogger<MyPlaylistsViewModel> _logger;
     private readonly AlbumClient _albumClient;
@@ -43,6 +45,9 @@ public partial class MyPlaylistsViewModel : PageViewModelBase
     private bool _hasMoreSongs = true;
     [ObservableProperty]
     public partial bool IsImportingExternalPlaylist { get; set; }
+
+    [ObservableProperty]
+    public partial bool IsImportingJellyfinLibrary { get; set; }
 
     private bool _isLikePlaylistLocalMode;
     [ObservableProperty]
@@ -68,6 +73,7 @@ public partial class MyPlaylistsViewModel : PageViewModelBase
         ISukiToastManager toastManager,
         ICreatePlaylistDialogService createPlaylistDialogService,
         IFolderPickerService folderPickerService,
+        IJellyfinClient jellyfinClient,
         ILocalMusicLibraryService localMusicLibraryService,
         IExternalPlaylistImportService externalPlaylistImportService,
         ILogger<MyPlaylistsViewModel> logger)
@@ -79,6 +85,7 @@ public partial class MyPlaylistsViewModel : PageViewModelBase
         _toastManager = toastManager;
         _createPlaylistDialogService = createPlaylistDialogService;
         _folderPickerService = folderPickerService;
+        _jellyfinClient = jellyfinClient;
         _localMusicLibraryService = localMusicLibraryService;
         _externalPlaylistImportService = externalPlaylistImportService;
         _logger = logger;
@@ -346,6 +353,11 @@ public partial class MyPlaylistsViewModel : PageViewModelBase
 
     private static SongItem ToSongItem(LocalTrackItem item)
     {
+        var isJellyfinTrack = string.Equals(
+            item.SourceType,
+            LocalMusicLibraryService.SourceTypeJellyfin,
+            StringComparison.Ordinal);
+
         return new SongItem
         {
             LocalTrackId = item.Id,
@@ -353,8 +365,12 @@ public partial class MyPlaylistsViewModel : PageViewModelBase
             Singer = item.Artist,
             AlbumName = item.Album,
             DurationSeconds = item.DurationSeconds,
+            LocalSourceType = item.SourceType,
             LocalFilePath = item.LocalPath,
-            Cover = GetImageSourceOrDefault(item.CoverPath, DefaultSongCover)
+            RemoteUrl = item.RemoteUrl,
+            Cover = isJellyfinTrack
+                ? string.IsNullOrWhiteSpace(item.CoverPath) ? DefaultSongCover : item.CoverPath
+                : GetImageSourceOrDefault(item.CoverPath, DefaultSongCover)
         };
     }
 
@@ -789,6 +805,135 @@ public partial class MyPlaylistsViewModel : PageViewModelBase
     }
 
     [RelayCommand]
+    private async Task ImportJellyfinLibrary()
+    {
+        if (IsImportingJellyfinLibrary)
+            return;
+
+        var lastSettings = GetLastJellyfinSettings();
+        var options = await _createPlaylistDialogService.PromptJellyfinConnectionAsync(lastSettings);
+        if (options == null)
+            return;
+
+        IsImportingJellyfinLibrary = true;
+        try
+        {
+            var libraries = await _jellyfinClient.GetMusicLibrariesAsync(options);
+            if (libraries.Count == 0)
+            {
+                _toastManager.CreateToast()
+                    .OfType(NotificationType.Warning)
+                    .WithTitle("未找到音乐库")
+                    .WithContent("当前 Jellyfin 用户没有可导入的音乐媒体库。")
+                    .Dismiss().After(TimeSpan.FromSeconds(4))
+                    .Dismiss().ByClicking()
+                    .Queue();
+                return;
+            }
+
+            SaveJellyfinSettings(options);
+
+            var library = await _createPlaylistDialogService.PromptJellyfinLibraryAsync(libraries);
+            if (library == null)
+                return;
+
+            var progressBar = new ProgressBar
+            {
+                Value = 0,
+                Minimum = 0,
+                Maximum = 100,
+                ShowProgressText = true
+            };
+            var progressText = new TextBlock { Text = "准备导入..." };
+            var progressContent = new StackPanel
+            {
+                Spacing = 8,
+                Children = { progressText, progressBar }
+            };
+
+            var progressToast = _toastManager.CreateToast()
+                .WithTitle("正在导入 Jellyfin...")
+                .WithContent(progressContent)
+                .Queue();
+
+            var progressReporter = new Progress<JellyfinImportProgress>(p =>
+            {
+                progressBar.Value = p.Percentage;
+                progressText.Text = p.Message;
+            });
+
+            IReadOnlyList<LocalPlaylistSummary> imported;
+            try
+            {
+                imported = await _localMusicLibraryService.ImportJellyfinLibraryAsync(
+                    options,
+                    library,
+                    progressReporter);
+            }
+            finally
+            {
+                _toastManager.Dismiss(progressToast);
+            }
+
+            await LoadAllPlaylists();
+            var firstImported = imported.FirstOrDefault();
+            var item = firstImported == null
+                ? null
+                : LocalLibraryPlaylists.FirstOrDefault(x => x.Id == firstImported.Id.ToString());
+            if (item != null)
+                await OpenPlaylist(item);
+
+            var importedSongCount = imported.Sum(x => x.TrackCount);
+            _toastManager.CreateToast()
+                .OfType(NotificationType.Success)
+                .WithTitle("导入完成")
+                .WithContent($"已按专辑同步 Jellyfin 媒体库「{library.Name}」，生成 {imported.Count} 个本地歌单，共 {importedSongCount} 首。")
+                .Dismiss().After(TimeSpan.FromSeconds(5))
+                .Dismiss().ByClicking()
+                .Queue();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "导入 Jellyfin 媒体库失败");
+            _toastManager.CreateToast()
+                .OfType(NotificationType.Error)
+                .WithTitle("导入失败")
+                .WithContent(ex.Message)
+                .Dismiss().After(TimeSpan.FromSeconds(5))
+                .Dismiss().ByClicking()
+                .Queue();
+        }
+        finally
+        {
+            IsImportingJellyfinLibrary = false;
+        }
+    }
+
+    private static JellyfinServerSettings? GetLastJellyfinSettings()
+    {
+        var fingerprint = SettingsManager.Settings.LastJellyfinServerFingerprint;
+        if (string.IsNullOrWhiteSpace(fingerprint))
+            return null;
+
+        return SettingsManager.Settings.JellyfinServers.TryGetValue(fingerprint, out var settings)
+            ? settings
+            : null;
+    }
+
+    private void SaveJellyfinSettings(JellyfinConnectionOptions options)
+    {
+        var fingerprint = _jellyfinClient.GetServerFingerprint(options.ServerUrl);
+        SettingsManager.Settings.JellyfinServers[fingerprint] = new JellyfinServerSettings
+        {
+            ServerUrl = options.ServerUrl.Trim().TrimEnd('/'),
+            UserId = options.UserId.Trim(),
+            ApiKey = options.ApiKey.Trim()
+        };
+        SettingsManager.Settings.LastJellyfinServerFingerprint = fingerprint;
+        SettingsManager.Save();
+    }
+
+    [RelayCommand]
     private async Task CreateOnlinePlaylist(string name)
     {
         if (string.IsNullOrWhiteSpace(name)) return;
@@ -1028,7 +1173,16 @@ public partial class MyPlaylistsViewModel : PageViewModelBase
 
     private static string GetImageSourceOrDefault(string? imagePath, string defaultSource)
     {
-        if (string.IsNullOrWhiteSpace(imagePath) || !System.IO.File.Exists(imagePath))
+        if (string.IsNullOrWhiteSpace(imagePath))
+            return defaultSource;
+
+        if (Uri.TryCreate(imagePath, UriKind.Absolute, out var uri) &&
+            (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps || uri.Scheme == "avares"))
+        {
+            return imagePath;
+        }
+
+        if (!System.IO.File.Exists(imagePath))
             return defaultSource;
 
         return new Uri(imagePath).AbsoluteUri;
