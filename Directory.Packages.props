@@ -16,6 +16,7 @@
     <PackageVersion Include="ManagedBass.Fx" Version="4.1.0-prerelease" />
     <PackageVersion Include="ManagedBass.Loud" Version="4.1.0-prerelease" />
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.8" />
+    <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.8" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.8" />
     <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.3" />
     <PackageVersion Include="Scalar.AspNetCore" Version="2.12.8" />

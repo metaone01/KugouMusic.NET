@@ -1,34 +1,33 @@
 using System;
-using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.IO;
-using Microsoft.EntityFrameworkCore;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Data.Sqlite;
 
 namespace KugouAvaloniaPlayer.Services;
 
-[method: UnconditionalSuppressMessage(
-    "Trimming",
-    "IL2026",
-    Justification = "The desktop app intentionally uses EF Core for local SQLite persistence.")]
-public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
+public static class AppDatabase
 {
     public static readonly string DatabasePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "kugou",
         "kugou-player.db");
 
-    public DbSet<AppKeyValueEntity> KeyValues => Set<AppKeyValueEntity>();
-    public DbSet<LocalPlaylistEntity> LocalPlaylists => Set<LocalPlaylistEntity>();
-    public DbSet<LocalPlaylistTrackEntity> LocalPlaylistTracks => Set<LocalPlaylistTrackEntity>();
-    public DbSet<LocalTrackEntity> LocalTracks => Set<LocalTrackEntity>();
-
-    public static AppDbContext Create()
+    public static SqliteConnection CreateConnection()
     {
-        var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseSqlite($"Data Source={DatabasePath}")
-            .Options;
+        var connection = new SqliteConnection($"Data Source={DatabasePath}");
+        connection.Open();
+        EnableForeignKeys(connection);
+        return connection;
+    }
 
-        return new AppDbContext(options);
+    public static async Task<SqliteConnection> CreateConnectionAsync(CancellationToken cancellationToken = default)
+    {
+        var connection = new SqliteConnection($"Data Source={DatabasePath}");
+        await connection.OpenAsync(cancellationToken);
+        await EnableForeignKeysAsync(connection, cancellationToken);
+        return connection;
     }
 
     public static void EnsureDatabaseCreated()
@@ -37,9 +36,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         if (!string.IsNullOrWhiteSpace(directory) && !Directory.Exists(directory))
             Directory.CreateDirectory(directory);
 
-        using var db = Create();
-        db.Database.EnsureCreated();
-        db.Database.ExecuteSqlRaw(
+        using var connection = CreateConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
             """
             CREATE TABLE IF NOT EXISTS kv_store (
                 scope TEXT NOT NULL,
@@ -89,74 +88,40 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             CREATE INDEX IF NOT EXISTS IX_playlists_kind_source_ref ON playlists (kind, source_ref);
             CREATE INDEX IF NOT EXISTS IX_playlist_tracks_playlist_id_position ON playlist_tracks (playlist_id, position);
             CREATE INDEX IF NOT EXISTS IX_playlist_tracks_track_id ON playlist_tracks (track_id);
-            """);
+            """;
+        command.ExecuteNonQuery();
     }
 
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    public static string FormatDateTime(DateTime value)
     {
-        var keyValue = modelBuilder.Entity<AppKeyValueEntity>();
-        keyValue.ToTable("kv_store");
-        keyValue.HasKey(x => new { x.Scope, x.Key });
-        keyValue.Property(x => x.Scope).HasColumnName("scope").HasMaxLength(128);
-        keyValue.Property(x => x.Key).HasColumnName("key").HasMaxLength(256);
-        keyValue.Property(x => x.Value).HasColumnName("value").IsRequired();
-        keyValue.Property(x => x.UpdatedAt).HasColumnName("updated_at").IsRequired();
-
-        var track = modelBuilder.Entity<LocalTrackEntity>();
-        track.ToTable("tracks");
-        track.HasKey(x => x.Id);
-        track.Property(x => x.Id).HasColumnName("id");
-        track.Property(x => x.SourceType).HasColumnName("source_type").IsRequired();
-        track.Property(x => x.LocalPath).HasColumnName("local_path").IsRequired();
-        track.HasIndex(x => x.LocalPath).IsUnique();
-        track.Property(x => x.Title).HasColumnName("title").IsRequired();
-        track.Property(x => x.Artist).HasColumnName("artist").IsRequired();
-        track.Property(x => x.Album).HasColumnName("album").IsRequired();
-        track.Property(x => x.DurationSeconds).HasColumnName("duration_seconds");
-        track.Property(x => x.CoverPath).HasColumnName("cover_path");
-        track.Property(x => x.RemoteUrl).HasColumnName("remote_url");
-        track.Property(x => x.FileSize).HasColumnName("file_size");
-        track.Property(x => x.LastWriteTimeUtc).HasColumnName("last_write_time_utc").IsRequired();
-        track.Property(x => x.CreatedAtUtc).HasColumnName("created_at").IsRequired();
-        track.Property(x => x.UpdatedAtUtc).HasColumnName("updated_at").IsRequired();
-
-        var playlist = modelBuilder.Entity<LocalPlaylistEntity>();
-        playlist.ToTable("playlists");
-        playlist.HasKey(x => x.Id);
-        playlist.Property(x => x.Id).HasColumnName("id");
-        playlist.Property(x => x.Name).HasColumnName("name").IsRequired();
-        playlist.Property(x => x.CoverPath).HasColumnName("cover_path");
-        playlist.Property(x => x.Kind).HasColumnName("kind").IsRequired();
-        playlist.Property(x => x.SourceRef).HasColumnName("source_ref");
-        playlist.Property(x => x.CreatedAtUtc).HasColumnName("created_at").IsRequired();
-        playlist.Property(x => x.UpdatedAtUtc).HasColumnName("updated_at").IsRequired();
-        playlist.HasIndex(x => new { x.Kind, x.SourceRef });
-        playlist.HasMany(x => x.Tracks)
-            .WithOne(x => x.Playlist)
-            .HasForeignKey(x => x.PlaylistId)
-            .OnDelete(DeleteBehavior.Cascade);
-
-        var playlistTrack = modelBuilder.Entity<LocalPlaylistTrackEntity>();
-        playlistTrack.ToTable("playlist_tracks");
-        playlistTrack.HasKey(x => new { x.PlaylistId, x.TrackId });
-        playlistTrack.Property(x => x.PlaylistId).HasColumnName("playlist_id");
-        playlistTrack.Property(x => x.TrackId).HasColumnName("track_id");
-        playlistTrack.Property(x => x.Position).HasColumnName("position");
-        playlistTrack.Property(x => x.AddedAtUtc).HasColumnName("added_at").IsRequired();
-        playlistTrack.HasIndex(x => new { x.PlaylistId, x.Position });
-        playlistTrack.HasOne(x => x.Track)
-            .WithMany(x => x.Playlists)
-            .HasForeignKey(x => x.TrackId)
-            .OnDelete(DeleteBehavior.Cascade);
+        return value.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture);
     }
-}
 
-public sealed class AppKeyValueEntity
-{
-    public string Scope { get; set; } = "";
-    public string Key { get; set; } = "";
-    public string Value { get; set; } = "";
-    public DateTime UpdatedAt { get; set; }
+    public static DateTime ReadDateTime(SqliteDataReader reader, string name)
+    {
+        var value = reader.GetString(reader.GetOrdinal(name));
+        return DateTime.TryParse(
+            value,
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+            out var parsed)
+            ? parsed
+            : DateTime.MinValue;
+    }
+
+    private static void EnableForeignKeys(SqliteConnection connection)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = "PRAGMA foreign_keys = ON;";
+        command.ExecuteNonQuery();
+    }
+
+    private static async Task EnableForeignKeysAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = "PRAGMA foreign_keys = ON;";
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
 }
 
 public sealed class LocalTrackEntity
@@ -174,7 +139,6 @@ public sealed class LocalTrackEntity
     public DateTime LastWriteTimeUtc { get; set; }
     public DateTime CreatedAtUtc { get; set; }
     public DateTime UpdatedAtUtc { get; set; }
-    public List<LocalPlaylistTrackEntity> Playlists { get; set; } = new();
 }
 
 public sealed class LocalPlaylistEntity
@@ -186,15 +150,4 @@ public sealed class LocalPlaylistEntity
     public string? SourceRef { get; set; }
     public DateTime CreatedAtUtc { get; set; }
     public DateTime UpdatedAtUtc { get; set; }
-    public List<LocalPlaylistTrackEntity> Tracks { get; set; } = new();
-}
-
-public sealed class LocalPlaylistTrackEntity
-{
-    public long PlaylistId { get; set; }
-    public long TrackId { get; set; }
-    public int Position { get; set; }
-    public DateTime AddedAtUtc { get; set; }
-    public LocalPlaylistEntity Playlist { get; set; } = null!;
-    public LocalTrackEntity Track { get; set; } = null!;
 }

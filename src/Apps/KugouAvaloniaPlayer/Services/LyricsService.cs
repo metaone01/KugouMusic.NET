@@ -250,7 +250,7 @@ public class LyricsService(LyricClient lyricClient, ILogger<LyricsService> logge
         }
         else if (ext == ".vtt")
         {
-            var lines = content.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            var lines = content.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
             var regex = new Regex(@"(\d{2}:)?(\d{2}):(\d{2})\.(\d{3})\s*-->\s*(\d{2}:)?(\d{2}):(\d{2})\.(\d{3})");
 
             for (var i = 0; i < lines.Length; i++)

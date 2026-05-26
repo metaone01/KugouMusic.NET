@@ -8,7 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using KugouAvaloniaPlayer.Models;
 using KugouAvaloniaPlayer.Services.Jellyfin;
-using Microsoft.EntityFrameworkCore;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 using TagLib;
 using File = TagLib.File;
@@ -90,7 +90,7 @@ public sealed class LocalMusicLibraryService(
             if (_initialized)
                 return;
 
-            AppDbContext.EnsureDatabaseCreated();
+            AppDatabase.EnsureDatabaseCreated();
             _initialized = true;
         }
         finally
@@ -104,60 +104,48 @@ public sealed class LocalMusicLibraryService(
     public async Task<IReadOnlyList<LocalPlaylistSummary>> GetPlaylistsAsync(CancellationToken cancellationToken = default)
     {
         await EnsureInitializedAsync(cancellationToken);
-        await using var db = AppDbContext.Create();
-
-        return await db.LocalPlaylists
-            .AsNoTracking()
-            .OrderByDescending(x => x.UpdatedAtUtc)
-            .ThenByDescending(x => x.Id)
-            .Select(x => new LocalPlaylistSummary(
-                x.Id,
-                x.Name,
-                x.CoverPath,
-                x.Tracks.Count,
-                x.UpdatedAtUtc))
-            .ToListAsync(cancellationToken);
+        await using var connection = await AppDatabase.CreateConnectionAsync(cancellationToken);
+        return await GetPlaylistSummariesAsync(connection, cancellationToken);
     }
 
     public async Task<IReadOnlyList<LocalTrackItem>> GetPlaylistTracksAsync(long playlistId, CancellationToken cancellationToken = default)
     {
         await EnsureInitializedAsync(cancellationToken);
-        await using var db = AppDbContext.Create();
+        await using var connection = await AppDatabase.CreateConnectionAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT t.id, t.title, t.artist, t.album, t.duration_seconds, t.source_type, t.local_path, t.cover_path, t.remote_url
+            FROM playlist_tracks pt
+            INNER JOIN tracks t ON t.id = pt.track_id
+            WHERE pt.playlist_id = $playlistId
+            ORDER BY pt.position, pt.added_at, pt.track_id;
+            """;
+        command.Parameters.AddWithValue("$playlistId", playlistId);
 
-        return await db.LocalPlaylistTracks
-            .AsNoTracking()
-            .Where(x => x.PlaylistId == playlistId)
-            .OrderBy(x => x.Position)
-            .ThenBy(x => x.AddedAtUtc)
-            .ThenBy(x => x.TrackId)
-            .Select(x => new LocalTrackItem(
-                x.Track.Id,
-                x.Track.Title,
-                x.Track.Artist,
-                x.Track.Album,
-                x.Track.DurationSeconds,
-                x.Track.SourceType,
-                x.Track.LocalPath,
-                x.Track.CoverPath,
-                x.Track.RemoteUrl))
-            .ToListAsync(cancellationToken);
+        var tracks = new List<LocalTrackItem>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+            tracks.Add(ReadTrackItem(reader));
+
+        return tracks;
     }
 
     public async Task<LocalPlaylistSummary> CreatePlaylistAsync(string name, CancellationToken cancellationToken = default)
     {
         await EnsureInitializedAsync(cancellationToken);
-        await using var db = AppDbContext.Create();
+        await using var connection = await AppDatabase.CreateConnectionAsync(cancellationToken);
+        var now = DateTime.UtcNow;
         var playlist = new LocalPlaylistEntity
         {
             Name = string.IsNullOrWhiteSpace(name) ? "新建本地歌单" : name.Trim(),
             Kind = PlaylistKindManual,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now
         };
 
-        db.LocalPlaylists.Add(playlist);
-        await db.SaveChangesAsync(cancellationToken);
-        return await GetPlaylistSummaryAsync(db, playlist.Id, cancellationToken);
+        playlist.Id = await InsertPlaylistAsync(connection, null, playlist, cancellationToken);
+        return await GetPlaylistSummaryAsync(connection, null, playlist.Id, cancellationToken);
     }
 
     public async Task<IReadOnlyList<LocalPlaylistSummary>> ImportJellyfinLibraryAsync(
@@ -171,7 +159,7 @@ public sealed class LocalMusicLibraryService(
         var serverFingerprint = jellyfinClient.GetServerFingerprint(options.ServerUrl);
         var audioItems = await jellyfinClient.GetAudioItemsAsync(options, library.Id, progress, cancellationToken);
         var albumGroups = audioItems
-            .GroupBy(x => GetJellyfinAlbumKey(x))
+            .GroupBy(GetJellyfinAlbumKey)
             .Select(x => new JellyfinAlbumGroup(
                 x.Key,
                 GetJellyfinAlbumName(x.First()),
@@ -179,65 +167,64 @@ public sealed class LocalMusicLibraryService(
             .OrderBy(x => x.Name, StringComparer.CurrentCultureIgnoreCase)
             .ToList();
 
-        await using var db = AppDbContext.Create();
-        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        await using var connection = await AppDatabase.CreateConnectionAsync(cancellationToken);
+        await using var transaction = connection.BeginTransaction();
 
-        var legacyLibrarySourceRef = $"{serverFingerprint}:{library.Id}";
-        var legacyLibraryPlaylist = await db.LocalPlaylists
-            .FirstOrDefaultAsync(
-                x => x.Kind == PlaylistKindJellyfinLibrary && x.SourceRef == legacyLibrarySourceRef,
-                cancellationToken);
+        var legacyLibrarySourceRef = serverFingerprint + ":" + library.Id;
+        var legacyLibraryPlaylist = await FindPlaylistAsync(
+            connection,
+            transaction,
+            PlaylistKindJellyfinLibrary,
+            legacyLibrarySourceRef,
+            cancellationToken);
         if (legacyLibraryPlaylist != null)
         {
-            db.LocalPlaylists.Remove(legacyLibraryPlaylist);
-            await db.SaveChangesAsync(cancellationToken);
+            await DeletePlaylistAsync(connection, transaction, legacyLibraryPlaylist.Id, cancellationToken);
         }
 
         var importedPlaylistIds = new List<long>();
         var processedSongs = 0;
         foreach (var albumGroup in albumGroups)
         {
-            var sourceRef = $"{serverFingerprint}:{library.Id}:{albumGroup.Key}";
-            var playlist = await db.LocalPlaylists
-                .Include(x => x.Tracks)
-                .FirstOrDefaultAsync(
-                    x => x.Kind == PlaylistKindJellyfinLibrary && x.SourceRef == sourceRef,
-                    cancellationToken);
+            var sourceRef = serverFingerprint + ":" + library.Id + ":" + albumGroup.Key;
+            var playlist = await FindPlaylistAsync(
+                connection,
+                transaction,
+                PlaylistKindJellyfinLibrary,
+                sourceRef,
+                cancellationToken);
 
             if (playlist == null)
             {
+                var now = DateTime.UtcNow;
                 playlist = new LocalPlaylistEntity
                 {
                     Name = albumGroup.Name,
                     Kind = PlaylistKindJellyfinLibrary,
                     SourceRef = sourceRef,
-                    CreatedAtUtc = DateTime.UtcNow,
-                    UpdatedAtUtc = DateTime.UtcNow
+                    CreatedAtUtc = now,
+                    UpdatedAtUtc = now
                 };
-                db.LocalPlaylists.Add(playlist);
-                await db.SaveChangesAsync(cancellationToken);
+                playlist.Id = await InsertPlaylistAsync(connection, transaction, playlist, cancellationToken);
             }
             else
             {
                 playlist.Name = albumGroup.Name;
+                playlist.UpdatedAtUtc = DateTime.UtcNow;
+                await UpdatePlaylistAsync(connection, transaction, playlist, cancellationToken);
             }
 
-            var existingLinks = await db.LocalPlaylistTracks
-                .Where(x => x.PlaylistId == playlist.Id)
-                .ToListAsync(cancellationToken);
-            db.LocalPlaylistTracks.RemoveRange(existingLinks);
-            await db.SaveChangesAsync(cancellationToken);
+            await DeletePlaylistTracksAsync(connection, transaction, playlist.Id, cancellationToken);
 
             for (var i = 0; i < albumGroup.Items.Count; i++)
             {
-                var track = await UpsertJellyfinTrackAsync(db, serverFingerprint, albumGroup.Items[i], cancellationToken);
-                db.LocalPlaylistTracks.Add(new LocalPlaylistTrackEntity
-                {
-                    PlaylistId = playlist.Id,
-                    TrackId = track.Id,
-                    Position = i,
-                    AddedAtUtc = DateTime.UtcNow
-                });
+                var track = await UpsertJellyfinTrackAsync(
+                    connection,
+                    transaction,
+                    serverFingerprint,
+                    albumGroup.Items[i],
+                    cancellationToken);
+                await InsertPlaylistTrackAsync(connection, transaction, playlist.Id, track.Id, i, DateTime.UtcNow, cancellationToken);
 
                 processedSongs++;
                 progress?.Report(new JellyfinImportProgress
@@ -250,15 +237,15 @@ public sealed class LocalMusicLibraryService(
 
             playlist.CoverPath = albumGroup.Items.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x.CoverUrl))?.CoverUrl;
             playlist.UpdatedAtUtc = DateTime.UtcNow;
+            await UpdatePlaylistAsync(connection, transaction, playlist, cancellationToken);
             importedPlaylistIds.Add(playlist.Id);
         }
 
-        await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
         var summaries = new List<LocalPlaylistSummary>();
         foreach (var playlistId in importedPlaylistIds)
-            summaries.Add(await GetPlaylistSummaryAsync(db, playlistId, cancellationToken));
+            summaries.Add(await GetPlaylistSummaryAsync(connection, null, playlistId, cancellationToken));
 
         return summaries;
     }
@@ -273,35 +260,36 @@ public sealed class LocalMusicLibraryService(
             .Where(IsSupportedAudioFile)
             .ToList();
 
-        await using var db = AppDbContext.Create();
-        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        await using var connection = await AppDatabase.CreateConnectionAsync(cancellationToken);
+        await using var transaction = connection.BeginTransaction();
 
-        var playlist = await db.LocalPlaylists
-            .Include(x => x.Tracks)
-            .FirstOrDefaultAsync(
-                x => x.Kind == PlaylistKindImportedFolder && x.SourceRef == folderPath,
-                cancellationToken);
+        var playlist = await FindPlaylistAsync(
+            connection,
+            transaction,
+            PlaylistKindImportedFolder,
+            folderPath,
+            cancellationToken);
 
         if (playlist == null)
         {
+            var now = DateTime.UtcNow;
             playlist = new LocalPlaylistEntity
             {
                 Name = new DirectoryInfo(folderPath).Name,
                 Kind = PlaylistKindImportedFolder,
                 SourceRef = folderPath,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = now,
+                UpdatedAtUtc = now
             };
-            db.LocalPlaylists.Add(playlist);
-            await db.SaveChangesAsync(cancellationToken);
+            playlist.Id = await InsertPlaylistAsync(connection, transaction, playlist, cancellationToken);
         }
 
-        await ReplacePlaylistTracksAsync(db, playlist, files, null, cancellationToken);
+        await ReplacePlaylistTracksAsync(connection, transaction, playlist.Id, files, null, cancellationToken);
         playlist.UpdatedAtUtc = DateTime.UtcNow;
-        await db.SaveChangesAsync(cancellationToken);
+        await UpdatePlaylistAsync(connection, transaction, playlist, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
-        return await GetPlaylistSummaryAsync(db, playlist.Id, cancellationToken);
+        return await GetPlaylistSummaryAsync(connection, null, playlist.Id, cancellationToken);
     }
 
     public async Task AddFilesToPlaylistAsync(long playlistId, IEnumerable<string> filePaths, CancellationToken cancellationToken = default)
@@ -311,72 +299,65 @@ public sealed class LocalMusicLibraryService(
         if (files.Count == 0)
             return;
 
-        await using var db = AppDbContext.Create();
-        var playlist = await db.LocalPlaylists
-            .Include(x => x.Tracks)
-            .FirstOrDefaultAsync(x => x.Id == playlistId, cancellationToken);
+        await using var connection = await AppDatabase.CreateConnectionAsync(cancellationToken);
+        var playlist = await GetPlaylistAsync(connection, null, playlistId, cancellationToken);
         if (playlist == null)
             return;
 
-        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        var position = playlist.Tracks.Count == 0 ? 0 : playlist.Tracks.Max(x => x.Position) + 1;
+        await using var transaction = connection.BeginTransaction();
+        var existingTrackIds = await GetPlaylistTrackIdsAsync(connection, transaction, playlist.Id, cancellationToken);
+        var position = await GetNextPlaylistPositionAsync(connection, transaction, playlist.Id, cancellationToken);
         for (var i = 0; i < files.Count; i++)
         {
-            var track = await UpsertTrackAsync(db, files[i], null, cancellationToken);
-            if (playlist.Tracks.Any(x => x.TrackId == track.Id))
+            var track = await UpsertTrackAsync(connection, transaction, files[i], null, cancellationToken);
+            if (existingTrackIds.Contains(track.Id))
                 continue;
 
-            playlist.Tracks.Add(new LocalPlaylistTrackEntity
-            {
-                PlaylistId = playlist.Id,
-                TrackId = track.Id,
-                Position = position + i,
-                AddedAtUtc = DateTime.UtcNow
-            });
+            await InsertPlaylistTrackAsync(connection, transaction, playlist.Id, track.Id, position + i, DateTime.UtcNow, cancellationToken);
+            existingTrackIds.Add(track.Id);
         }
 
         playlist.UpdatedAtUtc = DateTime.UtcNow;
-        await db.SaveChangesAsync(cancellationToken);
+        await UpdatePlaylistAsync(connection, transaction, playlist, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
     }
 
     public async Task UpdatePlaylistAsync(long playlistId, string name, string? coverPath, CancellationToken cancellationToken = default)
     {
         await EnsureInitializedAsync(cancellationToken);
-        await using var db = AppDbContext.Create();
-        var playlist = await db.LocalPlaylists.FirstOrDefaultAsync(x => x.Id == playlistId, cancellationToken);
+        await using var connection = await AppDatabase.CreateConnectionAsync(cancellationToken);
+        var playlist = await GetPlaylistAsync(connection, null, playlistId, cancellationToken);
         if (playlist == null)
             return;
 
         playlist.Name = string.IsNullOrWhiteSpace(name) ? "本地歌单" : name.Trim();
         playlist.CoverPath = string.IsNullOrWhiteSpace(coverPath) ? null : coverPath;
         playlist.UpdatedAtUtc = DateTime.UtcNow;
-        await db.SaveChangesAsync(cancellationToken);
+        await UpdatePlaylistAsync(connection, null, playlist, cancellationToken);
     }
 
     public async Task DeletePlaylistAsync(long playlistId, CancellationToken cancellationToken = default)
     {
         await EnsureInitializedAsync(cancellationToken);
-        await using var db = AppDbContext.Create();
-        var playlist = await db.LocalPlaylists.FirstOrDefaultAsync(x => x.Id == playlistId, cancellationToken);
+        await using var connection = await AppDatabase.CreateConnectionAsync(cancellationToken);
+        var playlist = await GetPlaylistAsync(connection, null, playlistId, cancellationToken);
         if (playlist == null)
             return;
 
-        db.LocalPlaylists.Remove(playlist);
-        await db.SaveChangesAsync(cancellationToken);
+        await DeletePlaylistAsync(connection, null, playlist.Id, cancellationToken);
     }
 
     public async Task SetTrackCoverAsync(long trackId, string coverPath, CancellationToken cancellationToken = default)
     {
         await EnsureInitializedAsync(cancellationToken);
-        await using var db = AppDbContext.Create();
-        var track = await db.LocalTracks.FirstOrDefaultAsync(x => x.Id == trackId, cancellationToken);
+        await using var connection = await AppDatabase.CreateConnectionAsync(cancellationToken);
+        var track = await GetTrackAsync(connection, null, trackId, cancellationToken);
         if (track == null)
             return;
 
         track.CoverPath = coverPath;
         track.UpdatedAtUtc = DateTime.UtcNow;
-        await db.SaveChangesAsync(cancellationToken);
+        await UpdateTrackAsync(connection, null, track, cancellationToken);
     }
 
     private async Task ImportLegacyJsonAsync(CancellationToken cancellationToken)
@@ -423,28 +404,29 @@ public sealed class LocalMusicLibraryService(
             .Where(IsSupportedAudioFile)
             .ToList();
 
-        await using var db = AppDbContext.Create();
-        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        await using var connection = await AppDatabase.CreateConnectionAsync(cancellationToken);
+        await using var transaction = connection.BeginTransaction();
 
-        var playlist = await db.LocalPlaylists
-            .Include(x => x.Tracks)
-            .FirstOrDefaultAsync(
-                x => x.Kind == PlaylistKindImportedFolder && x.SourceRef == folderPath,
-                cancellationToken);
+        var playlist = await FindPlaylistAsync(
+            connection,
+            transaction,
+            PlaylistKindImportedFolder,
+            folderPath,
+            cancellationToken);
 
         if (playlist == null)
         {
+            var now = DateTime.UtcNow;
             playlist = new LocalPlaylistEntity
             {
                 Name = string.IsNullOrWhiteSpace(meta?.Name) ? new DirectoryInfo(folderPath).Name : meta!.Name!,
                 CoverPath = string.IsNullOrWhiteSpace(meta?.CoverPath) ? null : meta!.CoverPath,
                 Kind = PlaylistKindImportedFolder,
                 SourceRef = folderPath,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = now,
+                UpdatedAtUtc = now
             };
-            db.LocalPlaylists.Add(playlist);
-            await db.SaveChangesAsync(cancellationToken);
+            playlist.Id = await InsertPlaylistAsync(connection, transaction, playlist, cancellationToken);
         }
         else
         {
@@ -454,40 +436,37 @@ public sealed class LocalMusicLibraryService(
                 playlist.CoverPath = meta!.CoverPath;
         }
 
-        await ReplacePlaylistTracksAsync(db, playlist, files, meta?.SongCoverPaths, cancellationToken);
+        await ReplacePlaylistTracksAsync(connection, transaction, playlist.Id, files, meta?.SongCoverPaths, cancellationToken);
         playlist.UpdatedAtUtc = DateTime.UtcNow;
-        await db.SaveChangesAsync(cancellationToken);
+        await UpdatePlaylistAsync(connection, transaction, playlist, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
     }
 
     private async Task ReplacePlaylistTracksAsync(
-        AppDbContext db,
-        LocalPlaylistEntity playlist,
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        long playlistId,
         IReadOnlyList<string> filePaths,
         IReadOnlyDictionary<string, string>? legacySongCovers,
         CancellationToken cancellationToken)
     {
-        var existingLinks = await db.LocalPlaylistTracks
-            .Where(x => x.PlaylistId == playlist.Id)
-            .ToListAsync(cancellationToken);
-        db.LocalPlaylistTracks.RemoveRange(existingLinks);
-        await db.SaveChangesAsync(cancellationToken);
+        await DeletePlaylistTracksAsync(connection, transaction, playlistId, cancellationToken);
 
         for (var i = 0; i < filePaths.Count; i++)
         {
-            var track = await UpsertTrackAsync(db, filePaths[i], GetLegacyCover(filePaths[i], legacySongCovers), cancellationToken);
-            db.LocalPlaylistTracks.Add(new LocalPlaylistTrackEntity
-            {
-                PlaylistId = playlist.Id,
-                TrackId = track.Id,
-                Position = i,
-                AddedAtUtc = DateTime.UtcNow
-            });
+            var track = await UpsertTrackAsync(
+                connection,
+                transaction,
+                filePaths[i],
+                GetLegacyCover(filePaths[i], legacySongCovers),
+                cancellationToken);
+            await InsertPlaylistTrackAsync(connection, transaction, playlistId, track.Id, i, DateTime.UtcNow, cancellationToken);
         }
     }
 
     private async Task<LocalTrackEntity> UpsertTrackAsync(
-        AppDbContext db,
+        SqliteConnection connection,
+        SqliteTransaction transaction,
         string filePath,
         string? explicitCoverPath,
         CancellationToken cancellationToken)
@@ -496,7 +475,7 @@ public sealed class LocalMusicLibraryService(
         var now = DateTime.UtcNow;
         var lastWriteTime = System.IO.File.GetLastWriteTimeUtc(filePath);
         var fileSize = new FileInfo(filePath).Length;
-        var track = await db.LocalTracks.FirstOrDefaultAsync(x => x.LocalPath == filePath, cancellationToken);
+        var track = await GetTrackByLocalPathAsync(connection, transaction, filePath, cancellationToken);
 
         if (track == null)
         {
@@ -506,7 +485,6 @@ public sealed class LocalMusicLibraryService(
                 LocalPath = filePath,
                 CreatedAtUtc = now
             };
-            db.LocalTracks.Add(track);
         }
 
         track.Title = metadata.Title;
@@ -518,19 +496,20 @@ public sealed class LocalMusicLibraryService(
         track.FileSize = fileSize;
         track.LastWriteTimeUtc = lastWriteTime;
         track.UpdatedAtUtc = now;
-        await db.SaveChangesAsync(cancellationToken);
+        await UpsertTrackEntityAsync(connection, transaction, track, cancellationToken);
         return track;
     }
 
     private async Task<LocalTrackEntity> UpsertJellyfinTrackAsync(
-        AppDbContext db,
+        SqliteConnection connection,
+        SqliteTransaction transaction,
         string serverFingerprint,
         JellyfinAudioItem item,
         CancellationToken cancellationToken)
     {
         var pseudoPath = jellyfinClient.BuildPseudoPath(serverFingerprint, item.Id);
         var now = DateTime.UtcNow;
-        var track = await db.LocalTracks.FirstOrDefaultAsync(x => x.LocalPath == pseudoPath, cancellationToken);
+        var track = await GetTrackByLocalPathAsync(connection, transaction, pseudoPath, cancellationToken);
 
         if (track == null)
         {
@@ -540,7 +519,6 @@ public sealed class LocalMusicLibraryService(
                 LocalPath = pseudoPath,
                 CreatedAtUtc = now
             };
-            db.LocalTracks.Add(track);
         }
 
         track.SourceType = SourceTypeJellyfin;
@@ -553,7 +531,7 @@ public sealed class LocalMusicLibraryService(
         track.FileSize = 0;
         track.LastWriteTimeUtc = now;
         track.UpdatedAtUtc = now;
-        await db.SaveChangesAsync(cancellationToken);
+        await UpsertTrackEntityAsync(connection, transaction, track, cancellationToken);
         return track;
     }
 
@@ -574,22 +552,458 @@ public sealed class LocalMusicLibraryService(
     }
 
     private static async Task<LocalPlaylistSummary> GetPlaylistSummaryAsync(
-        AppDbContext db,
+        SqliteConnection connection,
+        SqliteTransaction? transaction,
         long playlistId,
         CancellationToken cancellationToken)
     {
-        var item = await db.LocalPlaylists
-            .AsNoTracking()
-            .Where(x => x.Id == playlistId)
-            .Select(x => new LocalPlaylistSummary(
-                x.Id,
-                x.Name,
-                x.CoverPath,
-                x.Tracks.Count,
-                x.UpdatedAtUtc))
-            .FirstOrDefaultAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            SELECT p.id, p.name, p.cover_path, p.updated_at, COUNT(pt.track_id) AS track_count
+            FROM playlists p
+            LEFT JOIN playlist_tracks pt ON pt.playlist_id = p.id
+            WHERE p.id = $playlistId
+            GROUP BY p.id, p.name, p.cover_path, p.updated_at
+            LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$playlistId", playlistId);
 
-        return item ?? throw new InvalidOperationException($"Local playlist not found: {playlistId}");
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (await reader.ReadAsync(cancellationToken))
+            return ReadPlaylistSummary(reader);
+
+        throw new InvalidOperationException($"Local playlist not found: {playlistId}");
+    }
+
+    private static async Task<List<LocalPlaylistSummary>> GetPlaylistSummariesAsync(
+        SqliteConnection connection,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT p.id, p.name, p.cover_path, p.updated_at, COUNT(pt.track_id) AS track_count
+            FROM playlists p
+            LEFT JOIN playlist_tracks pt ON pt.playlist_id = p.id
+            GROUP BY p.id, p.name, p.cover_path, p.updated_at
+            ORDER BY p.updated_at DESC, p.id DESC;
+            """;
+
+        var playlists = new List<LocalPlaylistSummary>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+            playlists.Add(ReadPlaylistSummary(reader));
+
+        return playlists;
+    }
+
+    private static async Task<LocalPlaylistEntity?> FindPlaylistAsync(
+        SqliteConnection connection,
+        SqliteTransaction? transaction,
+        string kind,
+        string? sourceRef,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            SELECT id, name, cover_path, kind, source_ref, created_at, updated_at
+            FROM playlists
+            WHERE kind = $kind AND source_ref IS $sourceRef
+            LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$kind", kind);
+        command.Parameters.AddWithValue("$sourceRef", DbValue(sourceRef));
+        return await ReadSinglePlaylistAsync(command, cancellationToken);
+    }
+
+    private static async Task<LocalPlaylistEntity?> GetPlaylistAsync(
+        SqliteConnection connection,
+        SqliteTransaction? transaction,
+        long playlistId,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            SELECT id, name, cover_path, kind, source_ref, created_at, updated_at
+            FROM playlists
+            WHERE id = $playlistId
+            LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$playlistId", playlistId);
+        return await ReadSinglePlaylistAsync(command, cancellationToken);
+    }
+
+    private static async Task<LocalTrackEntity?> GetTrackAsync(
+        SqliteConnection connection,
+        SqliteTransaction? transaction,
+        long trackId,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            SELECT id, source_type, local_path, title, artist, album, duration_seconds, cover_path, remote_url,
+                   file_size, last_write_time_utc, created_at, updated_at
+            FROM tracks
+            WHERE id = $trackId
+            LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$trackId", trackId);
+        return await ReadSingleTrackAsync(command, cancellationToken);
+    }
+
+    private static async Task<LocalTrackEntity?> GetTrackByLocalPathAsync(
+        SqliteConnection connection,
+        SqliteTransaction? transaction,
+        string localPath,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            SELECT id, source_type, local_path, title, artist, album, duration_seconds, cover_path, remote_url,
+                   file_size, last_write_time_utc, created_at, updated_at
+            FROM tracks
+            WHERE local_path = $localPath
+            LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$localPath", localPath);
+        return await ReadSingleTrackAsync(command, cancellationToken);
+    }
+
+    private static async Task<long> InsertPlaylistAsync(
+        SqliteConnection connection,
+        SqliteTransaction? transaction,
+        LocalPlaylistEntity playlist,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            INSERT INTO playlists (name, cover_path, kind, source_ref, created_at, updated_at)
+            VALUES ($name, $coverPath, $kind, $sourceRef, $createdAt, $updatedAt);
+            """;
+        AddPlaylistParameters(command, playlist);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+        var id = await GetLastInsertRowIdAsync(connection, transaction, cancellationToken);
+        playlist.Id = id;
+        return id;
+    }
+
+    private static async Task UpdatePlaylistAsync(
+        SqliteConnection connection,
+        SqliteTransaction? transaction,
+        LocalPlaylistEntity playlist,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            UPDATE playlists
+            SET name = $name,
+                cover_path = $coverPath,
+                kind = $kind,
+                source_ref = $sourceRef,
+                created_at = $createdAt,
+                updated_at = $updatedAt
+            WHERE id = $id;
+            """;
+        command.Parameters.AddWithValue("$id", playlist.Id);
+        AddPlaylistParameters(command, playlist);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private static async Task DeletePlaylistAsync(
+        SqliteConnection connection,
+        SqliteTransaction? transaction,
+        long playlistId,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = "DELETE FROM playlists WHERE id = $playlistId;";
+        command.Parameters.AddWithValue("$playlistId", playlistId);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private static async Task DeletePlaylistTracksAsync(
+        SqliteConnection connection,
+        SqliteTransaction? transaction,
+        long playlistId,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = "DELETE FROM playlist_tracks WHERE playlist_id = $playlistId;";
+        command.Parameters.AddWithValue("$playlistId", playlistId);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private static async Task<HashSet<long>> GetPlaylistTrackIdsAsync(
+        SqliteConnection connection,
+        SqliteTransaction? transaction,
+        long playlistId,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = "SELECT track_id FROM playlist_tracks WHERE playlist_id = $playlistId;";
+        command.Parameters.AddWithValue("$playlistId", playlistId);
+
+        var ids = new HashSet<long>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+            ids.Add(reader.GetInt64(0));
+
+        return ids;
+    }
+
+    private static async Task<int> GetNextPlaylistPositionAsync(
+        SqliteConnection connection,
+        SqliteTransaction? transaction,
+        long playlistId,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = "SELECT COALESCE(MAX(position) + 1, 0) FROM playlist_tracks WHERE playlist_id = $playlistId;";
+        command.Parameters.AddWithValue("$playlistId", playlistId);
+        return Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken) ?? 0);
+    }
+
+    private static async Task InsertPlaylistTrackAsync(
+        SqliteConnection connection,
+        SqliteTransaction? transaction,
+        long playlistId,
+        long trackId,
+        int position,
+        DateTime addedAt,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            INSERT OR IGNORE INTO playlist_tracks (playlist_id, track_id, position, added_at)
+            VALUES ($playlistId, $trackId, $position, $addedAt);
+            """;
+        command.Parameters.AddWithValue("$playlistId", playlistId);
+        command.Parameters.AddWithValue("$trackId", trackId);
+        command.Parameters.AddWithValue("$position", position);
+        command.Parameters.AddWithValue("$addedAt", AppDatabase.FormatDateTime(addedAt));
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private static async Task UpsertTrackEntityAsync(
+        SqliteConnection connection,
+        SqliteTransaction? transaction,
+        LocalTrackEntity track,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            INSERT INTO tracks (
+                source_type, local_path, title, artist, album, duration_seconds, cover_path, remote_url,
+                file_size, last_write_time_utc, created_at, updated_at
+            )
+            VALUES (
+                $sourceType, $localPath, $title, $artist, $album, $durationSeconds, $coverPath, $remoteUrl,
+                $fileSize, $lastWriteTimeUtc, $createdAt, $updatedAt
+            )
+            ON CONFLICT(local_path) DO UPDATE SET
+                source_type = excluded.source_type,
+                title = excluded.title,
+                artist = excluded.artist,
+                album = excluded.album,
+                duration_seconds = excluded.duration_seconds,
+                cover_path = excluded.cover_path,
+                remote_url = excluded.remote_url,
+                file_size = excluded.file_size,
+                last_write_time_utc = excluded.last_write_time_utc,
+                updated_at = excluded.updated_at;
+            """;
+        AddTrackParameters(command, track);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+
+        if (track.Id == 0)
+            track.Id = await GetTrackIdByLocalPathAsync(connection, transaction, track.LocalPath, cancellationToken);
+    }
+
+    private static async Task UpdateTrackAsync(
+        SqliteConnection connection,
+        SqliteTransaction? transaction,
+        LocalTrackEntity track,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            UPDATE tracks
+            SET source_type = $sourceType,
+                local_path = $localPath,
+                title = $title,
+                artist = $artist,
+                album = $album,
+                duration_seconds = $durationSeconds,
+                cover_path = $coverPath,
+                remote_url = $remoteUrl,
+                file_size = $fileSize,
+                last_write_time_utc = $lastWriteTimeUtc,
+                created_at = $createdAt,
+                updated_at = $updatedAt
+            WHERE id = $id;
+            """;
+        command.Parameters.AddWithValue("$id", track.Id);
+        AddTrackParameters(command, track);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private static async Task<long> GetTrackIdByLocalPathAsync(
+        SqliteConnection connection,
+        SqliteTransaction? transaction,
+        string localPath,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = "SELECT id FROM tracks WHERE local_path = $localPath LIMIT 1;";
+        command.Parameters.AddWithValue("$localPath", localPath);
+        return (long)(await command.ExecuteScalarAsync(cancellationToken) ?? 0L);
+    }
+
+    private static async Task<long> GetLastInsertRowIdAsync(
+        SqliteConnection connection,
+        SqliteTransaction? transaction,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = "SELECT last_insert_rowid();";
+        return (long)(await command.ExecuteScalarAsync(cancellationToken) ?? 0L);
+    }
+
+    private static async Task<LocalPlaylistEntity?> ReadSinglePlaylistAsync(
+        SqliteCommand command,
+        CancellationToken cancellationToken)
+    {
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        return await reader.ReadAsync(cancellationToken) ? ReadPlaylist(reader) : null;
+    }
+
+    private static async Task<LocalTrackEntity?> ReadSingleTrackAsync(
+        SqliteCommand command,
+        CancellationToken cancellationToken)
+    {
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        return await reader.ReadAsync(cancellationToken) ? ReadTrack(reader) : null;
+    }
+
+    private static LocalPlaylistSummary ReadPlaylistSummary(SqliteDataReader reader)
+    {
+        return new LocalPlaylistSummary(
+            reader.GetInt64(reader.GetOrdinal("id")),
+            reader.GetString(reader.GetOrdinal("name")),
+            GetNullableString(reader, "cover_path"),
+            Convert.ToInt32(reader.GetInt64(reader.GetOrdinal("track_count"))),
+            AppDatabase.ReadDateTime(reader, "updated_at"));
+    }
+
+    private static LocalTrackItem ReadTrackItem(SqliteDataReader reader)
+    {
+        return new LocalTrackItem(
+            reader.GetInt64(reader.GetOrdinal("id")),
+            reader.GetString(reader.GetOrdinal("title")),
+            reader.GetString(reader.GetOrdinal("artist")),
+            reader.GetString(reader.GetOrdinal("album")),
+            reader.GetDouble(reader.GetOrdinal("duration_seconds")),
+            reader.GetString(reader.GetOrdinal("source_type")),
+            reader.GetString(reader.GetOrdinal("local_path")),
+            GetNullableString(reader, "cover_path"),
+            GetNullableString(reader, "remote_url"));
+    }
+
+    private static LocalPlaylistEntity ReadPlaylist(SqliteDataReader reader)
+    {
+        return new LocalPlaylistEntity
+        {
+            Id = reader.GetInt64(reader.GetOrdinal("id")),
+            Name = reader.GetString(reader.GetOrdinal("name")),
+            CoverPath = GetNullableString(reader, "cover_path"),
+            Kind = reader.GetString(reader.GetOrdinal("kind")),
+            SourceRef = GetNullableString(reader, "source_ref"),
+            CreatedAtUtc = AppDatabase.ReadDateTime(reader, "created_at"),
+            UpdatedAtUtc = AppDatabase.ReadDateTime(reader, "updated_at")
+        };
+    }
+
+    private static LocalTrackEntity ReadTrack(SqliteDataReader reader)
+    {
+        return new LocalTrackEntity
+        {
+            Id = reader.GetInt64(reader.GetOrdinal("id")),
+            SourceType = reader.GetString(reader.GetOrdinal("source_type")),
+            LocalPath = reader.GetString(reader.GetOrdinal("local_path")),
+            Title = reader.GetString(reader.GetOrdinal("title")),
+            Artist = reader.GetString(reader.GetOrdinal("artist")),
+            Album = reader.GetString(reader.GetOrdinal("album")),
+            DurationSeconds = reader.GetDouble(reader.GetOrdinal("duration_seconds")),
+            CoverPath = GetNullableString(reader, "cover_path"),
+            RemoteUrl = GetNullableString(reader, "remote_url"),
+            FileSize = reader.GetInt64(reader.GetOrdinal("file_size")),
+            LastWriteTimeUtc = AppDatabase.ReadDateTime(reader, "last_write_time_utc"),
+            CreatedAtUtc = AppDatabase.ReadDateTime(reader, "created_at"),
+            UpdatedAtUtc = AppDatabase.ReadDateTime(reader, "updated_at")
+        };
+    }
+
+    private static void AddPlaylistParameters(SqliteCommand command, LocalPlaylistEntity playlist)
+    {
+        command.Parameters.AddWithValue("$name", playlist.Name);
+        command.Parameters.AddWithValue("$coverPath", DbValue(playlist.CoverPath));
+        command.Parameters.AddWithValue("$kind", playlist.Kind);
+        command.Parameters.AddWithValue("$sourceRef", DbValue(playlist.SourceRef));
+        command.Parameters.AddWithValue("$createdAt", AppDatabase.FormatDateTime(playlist.CreatedAtUtc));
+        command.Parameters.AddWithValue("$updatedAt", AppDatabase.FormatDateTime(playlist.UpdatedAtUtc));
+    }
+
+    private static void AddTrackParameters(SqliteCommand command, LocalTrackEntity track)
+    {
+        command.Parameters.AddWithValue("$sourceType", track.SourceType);
+        command.Parameters.AddWithValue("$localPath", track.LocalPath);
+        command.Parameters.AddWithValue("$title", track.Title);
+        command.Parameters.AddWithValue("$artist", track.Artist);
+        command.Parameters.AddWithValue("$album", track.Album);
+        command.Parameters.AddWithValue("$durationSeconds", track.DurationSeconds);
+        command.Parameters.AddWithValue("$coverPath", DbValue(track.CoverPath));
+        command.Parameters.AddWithValue("$remoteUrl", DbValue(track.RemoteUrl));
+        command.Parameters.AddWithValue("$fileSize", track.FileSize);
+        command.Parameters.AddWithValue("$lastWriteTimeUtc", AppDatabase.FormatDateTime(track.LastWriteTimeUtc));
+        command.Parameters.AddWithValue("$createdAt", AppDatabase.FormatDateTime(track.CreatedAtUtc));
+        command.Parameters.AddWithValue("$updatedAt", AppDatabase.FormatDateTime(track.UpdatedAtUtc));
+    }
+
+    private static string? GetNullableString(SqliteDataReader reader, string name)
+    {
+        var ordinal = reader.GetOrdinal(name);
+        return reader.IsDBNull(ordinal) ? null : reader.GetString(ordinal);
+    }
+
+    private static object DbValue(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? DBNull.Value : value;
     }
 
     private async Task EnsureInitializedAsync(CancellationToken cancellationToken)

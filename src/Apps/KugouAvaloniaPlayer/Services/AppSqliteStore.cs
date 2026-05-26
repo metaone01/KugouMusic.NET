@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using System.Linq;
 
 namespace KugouAvaloniaPlayer.Services;
 
@@ -13,11 +12,12 @@ public static class AppSqliteStore
         lock (SyncRoot)
         {
             EnsureCreated();
-            using var db = AppDbContext.Create();
-            return db.KeyValues
-                .Where(x => x.Scope == scope && x.Key == key)
-                .Select(x => x.Value)
-                .FirstOrDefault();
+            using var connection = AppDatabase.CreateConnection();
+            using var command = connection.CreateCommand();
+            command.CommandText = "SELECT value FROM kv_store WHERE scope = $scope AND key = $key LIMIT 1;";
+            command.Parameters.AddWithValue("$scope", scope);
+            command.Parameters.AddWithValue("$key", key);
+            return command.ExecuteScalar() as string;
         }
     }
 
@@ -26,25 +26,21 @@ public static class AppSqliteStore
         lock (SyncRoot)
         {
             EnsureCreated();
-            using var db = AppDbContext.Create();
-            var entity = db.KeyValues.FirstOrDefault(x => x.Scope == scope && x.Key == key);
-            if (entity == null)
-            {
-                db.KeyValues.Add(new AppKeyValueEntity
-                {
-                    Scope = scope,
-                    Key = key,
-                    Value = value,
-                    UpdatedAt = DateTime.UtcNow
-                });
-            }
-            else
-            {
-                entity.Value = value;
-                entity.UpdatedAt = DateTime.UtcNow;
-            }
-
-            db.SaveChanges();
+            using var connection = AppDatabase.CreateConnection();
+            using var command = connection.CreateCommand();
+            command.CommandText =
+                """
+                INSERT INTO kv_store (scope, key, value, updated_at)
+                VALUES ($scope, $key, $value, $updatedAt)
+                ON CONFLICT(scope, key) DO UPDATE SET
+                    value = excluded.value,
+                    updated_at = excluded.updated_at;
+                """;
+            command.Parameters.AddWithValue("$scope", scope);
+            command.Parameters.AddWithValue("$key", key);
+            command.Parameters.AddWithValue("$value", value);
+            command.Parameters.AddWithValue("$updatedAt", AppDatabase.FormatDateTime(DateTime.UtcNow));
+            command.ExecuteNonQuery();
         }
     }
 
@@ -53,13 +49,12 @@ public static class AppSqliteStore
         lock (SyncRoot)
         {
             EnsureCreated();
-            using var db = AppDbContext.Create();
-            var entity = db.KeyValues.FirstOrDefault(x => x.Scope == scope && x.Key == key);
-            if (entity == null)
-                return;
-
-            db.KeyValues.Remove(entity);
-            db.SaveChanges();
+            using var connection = AppDatabase.CreateConnection();
+            using var command = connection.CreateCommand();
+            command.CommandText = "DELETE FROM kv_store WHERE scope = $scope AND key = $key;";
+            command.Parameters.AddWithValue("$scope", scope);
+            command.Parameters.AddWithValue("$key", key);
+            command.ExecuteNonQuery();
         }
     }
 
@@ -78,8 +73,8 @@ public static class AppSqliteStore
 
     private static void EnsureCreated()
     {
-        AppDbContext.EnsureDatabaseCreated();
-        RestrictFileAccess(AppDbContext.DatabasePath);
+        AppDatabase.EnsureDatabaseCreated();
+        RestrictFileAccess(AppDatabase.DatabasePath);
     }
 
     private static void RestrictFileAccess(string path)
