@@ -40,6 +40,9 @@ public partial class MainWindowViewModel : ObservableObject
     public partial PageViewModelBase ActivePage { get; set; }
 
     [ObservableProperty]
+    public partial PageViewModelBase? SelectedMenuPage { get; set; }
+
+    [ObservableProperty]
     public partial bool IsDesktopLyricEnabled { get; set; }
 
     [ObservableProperty]
@@ -58,6 +61,8 @@ public partial class MainWindowViewModel : ObservableObject
     public partial bool IsMiniPlayerOpaque { get; set; } = true;
 
     private bool _isUpdatingActivePageFromNavigation;
+    private bool _isUpdatingSelectedMenuPageFromNavigation;
+
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SearchCommand))]
     public partial string SearchKeyword { get; set; } = "";
@@ -121,8 +126,9 @@ public partial class MainWindowViewModel : ObservableObject
         Pages.Add(rankViewModel);
         Pages.Add(_searchViewModel);
         _navigationService.CurrentPageChanged += OnNavigationCurrentPageChanged;
-        _navigationService.ReplaceRoot(_dailyRecommendViewModel);
+        _navigationService.NavigateRoot(_dailyRecommendViewModel);
         ActivePage = _dailyRecommendViewModel;
+        SelectedMenuPage = _dailyRecommendViewModel;
         IsDesktopLyricEnabled = _desktopLyricWindowService.IsOpen;
         ApplyCustomBackgroundImage(
             SettingsManager.Settings.UseCustomBackgroundImage,
@@ -140,7 +146,7 @@ public partial class MainWindowViewModel : ObservableObject
         {
             NowPlaying.CloseCommand.Execute(null);
             var singerVm = singerViewModelFactory1.Create(m.Singer.Id.ToString(), m.Singer.Name);
-            _navigationService.Push(singerVm);
+            _navigationService.Navigate(singerVm);
         });
 
         WeakReferenceMessenger.Default.Register<AuthStateChangedMessage>(this, (_, m) =>
@@ -150,9 +156,6 @@ public partial class MainWindowViewModel : ObservableObject
             else
                 OnLogoutRequested();
         });
-
-        WeakReferenceMessenger.Default.Register<NavigatePageMessage>(this,
-            (_, m) => { NavigateToPage(m.TargetPage); });
 
         WeakReferenceMessenger.Default.Register<RequestNavigateBackMessage>(this, (_, _) => { NavigateBack(); });
         WeakReferenceMessenger.Default.Register<AppBackgroundSettingsChangedMessage>(this, (_, message) =>
@@ -284,6 +287,14 @@ public partial class MainWindowViewModel : ObservableObject
         NavigateToPage(value);
     }
 
+    partial void OnSelectedMenuPageChanged(PageViewModelBase? value)
+    {
+        if (_isUpdatingSelectedMenuPageFromNavigation || value == null)
+            return;
+
+        NavigateToPage(value);
+    }
+
     private void OnNavigationCurrentPageChanged(PageViewModelBase? page)
     {
         if (page == null)
@@ -291,18 +302,25 @@ public partial class MainWindowViewModel : ObservableObject
 
         if (Dispatcher.UIThread.CheckAccess())
         {
-            _isUpdatingActivePageFromNavigation = true;
-            ActivePage = page;
-            _isUpdatingActivePageFromNavigation = false;
+            ApplyNavigationPage(page);
             return;
         }
 
-        Dispatcher.UIThread.Post(() =>
-        {
-            _isUpdatingActivePageFromNavigation = true;
-            ActivePage = page;
-            _isUpdatingActivePageFromNavigation = false;
-        });
+        Dispatcher.UIThread.Post(() => ApplyNavigationPage(page));
+    }
+
+    private void ApplyNavigationPage(PageViewModelBase page)
+    {
+        _isUpdatingActivePageFromNavigation = true;
+        ActivePage = page;
+        _isUpdatingActivePageFromNavigation = false;
+
+        if (!Pages.Contains(page))
+            return;
+
+        _isUpdatingSelectedMenuPageFromNavigation = true;
+        SelectedMenuPage = page;
+        _isUpdatingSelectedMenuPageFromNavigation = false;
     }
 
     private void NavigateToPage(PageViewModelBase page)
@@ -312,11 +330,11 @@ public partial class MainWindowViewModel : ObservableObject
 
         if (Pages.Contains(page))
         {
-            _navigationService.ReplaceRoot(page);
+            _navigationService.NavigateRoot(page);
             return;
         }
 
-        _navigationService.Push(page);
+        _navigationService.Navigate(page);
     }
 
 
@@ -464,7 +482,7 @@ public partial class MainWindowViewModel : ObservableObject
             _logger.LogInformation("已退出登录");
 
             // 返回每日推荐页面
-            _navigationService.ReplaceRoot(_dailyRecommendViewModel);
+            _navigationService.NavigateRoot(_dailyRecommendViewModel);
         });
     }
 
@@ -597,11 +615,11 @@ public partial class MainWindowViewModel : ObservableObject
     [RelayCommand]
     private void NavigateBack()
     {
-        if (_navigationService.TryGoBack())
+        if (_navigationService.GoBack())
             return;
 
         var dailyVm = Pages.OfType<DailyRecommendViewModel>().FirstOrDefault();
-        if (dailyVm != null) _navigationService.ReplaceRoot(dailyVm);
+        if (dailyVm != null) _navigationService.NavigateRoot(dailyVm);
     }
 
 

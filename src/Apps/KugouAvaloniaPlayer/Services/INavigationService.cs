@@ -10,7 +10,7 @@ public interface INavigationService
 
     event Action<PageViewModelBase?>? CurrentPageChanged;
 
-    void ReplaceRoot(PageViewModelBase page);
-    void Push(PageViewModelBase page);
-    bool TryGoBack();
+    void NavigateRoot(PageViewModelBase page);
+    void Navigate(PageViewModelBase page);
+    bool GoBack();
 }

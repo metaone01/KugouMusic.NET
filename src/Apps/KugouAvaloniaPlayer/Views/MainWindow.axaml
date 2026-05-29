@@ -213,7 +213,9 @@
     <Grid Name="MainGrid">
         <suki:SukiSideMenu
             ItemsSource="{Binding Pages}"
-            SelectedItem="{Binding ActivePage}"
+            SelectedItem="{Binding SelectedMenuPage}"
+            UseCustomContent="True"
+            Content="{Binding ActivePage}"
             IsSearchEnabled="False">
 
             <suki:SukiSideMenu.HeaderContent>

@@ -14,14 +14,14 @@ public sealed class NavigationService : INavigationService
 
     public event Action<PageViewModelBase?>? CurrentPageChanged;
 
-    public void ReplaceRoot(PageViewModelBase page)
+    public void NavigateRoot(PageViewModelBase page)
     {
         _stack.Clear();
         _stack.Push(page);
         CurrentPageChanged?.Invoke(CurrentPage);
     }
 
-    public void Push(PageViewModelBase page)
+    public void Navigate(PageViewModelBase page)
     {
         if (CurrentPage == page)
             return;
@@ -30,7 +30,7 @@ public sealed class NavigationService : INavigationService
         CurrentPageChanged?.Invoke(CurrentPage);
     }
 
-    public bool TryGoBack()
+    public bool GoBack()
     {
         if (!CanGoBack)
             return false;
