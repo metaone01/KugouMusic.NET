@@ -1,6 +1,7 @@
 using KuGou.Net.Clients;
 using KugouAvaloniaPlayer.Services.DesktopLyric;
 using Microsoft.Extensions.Logging;
+using SukiUI.Toasts;
 
 namespace KugouAvaloniaPlayer.ViewModels;
 
@@ -9,12 +10,24 @@ public interface ISingerViewModelFactory
     SingerViewModel Create(string authorId, string singerName);
 }
 
-public sealed class SingerViewModelFactory(ArtistClient artistClient, ILogger<SingerViewModel> logger)
+public sealed class SingerViewModelFactory(
+    ArtistClient artistClient,
+    AlbumClient albumClient,
+    PlaylistClient playlistClient,
+    ISukiToastManager toastManager,
+    ILogger<SingerViewModel> logger)
     : ISingerViewModelFactory
 {
     public SingerViewModel Create(string authorId, string singerName)
     {
-        return new SingerViewModel(artistClient, logger, authorId, singerName);
+        return new SingerViewModel(
+            artistClient,
+            albumClient,
+            playlistClient,
+            toastManager,
+            logger,
+            authorId,
+            singerName);
     }
 }
 

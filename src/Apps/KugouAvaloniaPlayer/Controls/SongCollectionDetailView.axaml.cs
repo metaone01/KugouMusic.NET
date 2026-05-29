@@ -21,6 +21,12 @@ public partial class SongCollectionDetailView : UserControl
     public static readonly StyledProperty<bool> ShowCoverProperty =
         AvaloniaProperty.Register<SongCollectionDetailView, bool>(nameof(ShowCover), true);
 
+    public static readonly StyledProperty<bool> ShowSongListProperty =
+        AvaloniaProperty.Register<SongCollectionDetailView, bool>(nameof(ShowSongList), true);
+
+    public static readonly StyledProperty<bool> ShowPlayAllButtonProperty =
+        AvaloniaProperty.Register<SongCollectionDetailView, bool>(nameof(ShowPlayAllButton), true);
+
     public static readonly StyledProperty<string> HeroBackgroundProperty =
         AvaloniaProperty.Register<SongCollectionDetailView, string>(nameof(HeroBackground), string.Empty);
 
@@ -156,6 +162,18 @@ public partial class SongCollectionDetailView : UserControl
     {
         get => GetValue(ShowCoverProperty);
         set => SetValue(ShowCoverProperty, value);
+    }
+
+    public bool ShowSongList
+    {
+        get => GetValue(ShowSongListProperty);
+        set => SetValue(ShowSongListProperty, value);
+    }
+
+    public bool ShowPlayAllButton
+    {
+        get => GetValue(ShowPlayAllButtonProperty);
+        set => SetValue(ShowPlayAllButtonProperty, value);
     }
 
     public string HeroBackground

@@ -180,6 +180,7 @@
                                   MaxWidth="{Binding #Root.TitleMaxWidth}">
                                 <Button Classes="HeroPrimaryButton"
                                         Command="{Binding #Root.PlayFirstSongCommand}"
+                                        IsVisible="{Binding #Root.ShowPlayAllButton}"
                                         Cursor="Hand">
                                     <StackPanel Orientation="Horizontal" Spacing="8">
                                         <Svg Classes="ThemeSvgIcon" Path="/Assets/play-1003-svgrepo-com.svg" Width="16" Height="16" />
@@ -253,7 +254,8 @@
                         Classes="CollectionPanel"
                         Margin="{Binding #Root.ListMargin}"
                         Padding="22,16,22,0"
-                        CornerRadius="18">
+                        CornerRadius="18"
+                        IsVisible="{Binding #Root.ShowSongList}">
             <Grid RowDefinitions="Auto,*">
                 <Grid ColumnDefinitions="*,150,80,150"
                       Margin="70,0,16,8">
