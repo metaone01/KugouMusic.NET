@@ -74,6 +74,9 @@ public partial class SidebarPlaylistItemControl : UserControl
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
+        _contextFlyout?.Hide();
+        _contextFlyout?.Items.Clear();
+        _contextFlyout = null;
         DetachLightDismissHandler();
         base.OnDetachedFromVisualTree(e);
     }

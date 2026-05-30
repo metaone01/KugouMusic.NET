@@ -41,6 +41,12 @@ public partial class SongListItemControl : UserControl
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
+        _moreFlyout?.Hide();
+        _moreFlyout?.Items.Clear();
+        _moreFlyout = null;
+        _contextFlyout?.Hide();
+        _contextFlyout?.Items.Clear();
+        _contextFlyout = null;
         DetachLightDismissHandler();
         base.OnDetachedFromVisualTree(e);
     }

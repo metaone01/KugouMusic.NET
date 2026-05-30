@@ -183,12 +183,12 @@ public class LyricView : ItemsControl
     private bool _positionFrameQueued;
     private TimeSpan _renderPosition;
     private TimeSpan _seekIndicatorPosition;
+    private bool _lifecycleEventsHooked;
 
     public LyricView()
     {
         _userScrollResetTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1800) };
-        _userScrollResetTimer.Tick += OnUserScrollTimeout;
-        LayoutUpdated += OnLayoutUpdated;
+        HookLifecycleEvents();
         ItemTemplate = CreateDefaultItemTemplate();
         _positionAnchor = Position;
         _positionAnchorTimestamp = Stopwatch.GetTimestamp();
@@ -389,6 +389,12 @@ public class LyricView : ItemsControl
 
     public TimeSpan RenderPosition => _renderPosition;
 
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        HookLifecycleEvents();
+        base.OnAttachedToVisualTree(e);
+    }
+
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnDetachedFromVisualTree(e);
@@ -398,14 +404,15 @@ public class LyricView : ItemsControl
         _userScrollResetTimer.Stop();
         HideSeekIndicator();
         UnhookCollectionChanged();
+        UnhookTemplateEvents();
+        UnhookLifecycleEvents();
     }
 
     protected override void OnApplyTemplate(TemplateAppliedEventArgs e)
     {
         base.OnApplyTemplate(e);
 
-        if (_seekIndicatorButton != null)
-            _seekIndicatorButton.Click -= OnSeekIndicatorButtonClick;
+        UnhookTemplateEvents();
 
         _seekIndicatorLayer = e.NameScope.Find<Canvas>("PART_SeekIndicatorLayer");
         _seekIndicatorLine = e.NameScope.Find<Border>("PART_SeekIndicatorLine");
@@ -417,6 +424,32 @@ public class LyricView : ItemsControl
             _seekIndicatorButton.Click += OnSeekIndicatorButtonClick;
 
         HideSeekIndicator();
+    }
+
+    private void HookLifecycleEvents()
+    {
+        if (_lifecycleEventsHooked)
+            return;
+
+        _userScrollResetTimer.Tick += OnUserScrollTimeout;
+        LayoutUpdated += OnLayoutUpdated;
+        _lifecycleEventsHooked = true;
+    }
+
+    private void UnhookLifecycleEvents()
+    {
+        if (!_lifecycleEventsHooked)
+            return;
+
+        _userScrollResetTimer.Tick -= OnUserScrollTimeout;
+        LayoutUpdated -= OnLayoutUpdated;
+        _lifecycleEventsHooked = false;
+    }
+
+    private void UnhookTemplateEvents()
+    {
+        if (_seekIndicatorButton != null)
+            _seekIndicatorButton.Click -= OnSeekIndicatorButtonClick;
     }
 
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)

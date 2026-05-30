@@ -63,6 +63,8 @@ public partial class BottomPlaybackControl : UserControl
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
+        _queueFlyout?.Hide();
+        _queueFlyout = null;
         DetachLightDismissHandler();
         base.OnDetachedFromVisualTree(e);
     }

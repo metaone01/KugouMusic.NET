@@ -6,6 +6,7 @@ namespace KugouAvaloniaPlayer.Services;
 
 public sealed class NavigationService : INavigationService
 {
+    private const int MaxHistoryDepth = 4;
     private readonly Stack<PageViewModelBase> _stack = new();
 
     public PageViewModelBase? CurrentPage => _stack.Count > 0 ? _stack.Peek() : null;
@@ -27,6 +28,7 @@ public sealed class NavigationService : INavigationService
             return;
 
         _stack.Push(page);
+        TrimHistory();
         CurrentPageChanged?.Invoke(CurrentPage);
     }
 
@@ -38,5 +40,17 @@ public sealed class NavigationService : INavigationService
         _stack.Pop();
         CurrentPageChanged?.Invoke(CurrentPage);
         return true;
+    }
+
+    private void TrimHistory()
+    {
+        if (_stack.Count <= MaxHistoryDepth)
+            return;
+
+        var newestToOldest = _stack.ToArray();
+        _stack.Clear();
+
+        for (var i = MaxHistoryDepth - 1; i >= 0; i--)
+            _stack.Push(newestToOldest[i]);
     }
 }
