@@ -382,8 +382,10 @@ public class RawSongApi(IKgTransport transport, KgSessionManager sessionManager)
     }
 
     public Task<JsonElement> GetUrlAsync(string hash, string? quality = "128", string? albumId = null,
-        string? albumAudioId = null, bool freePart = false)
+        string? albumAudioId = null, bool freePart = false, string? ppageId = null)
     {
+        var session = sessionManager.Session;
+        var dfid = string.IsNullOrWhiteSpace(session.Dfid) || session.Dfid == "-" ? KgUtils.RandomString(24) : session.Dfid;
         var normalizedQuality = quality is "piano" or "acappella" or "subwoofer" or "ancient" or "dj" or "surnay"
             ? $"magic_{quality}"
             : quality ?? "128";
@@ -407,14 +409,14 @@ public class RawSongApi(IKgTransport transport, KgSessionManager sessionManager)
                 ["cmd"] = "26",
                 ["pidversion"] = "3001",
                 ["IsFreePart"] = freePart ? "1" : "0",
-                ["ppage_id"] = "356753938,823673182,967485191",
+                ["ppage_id"] = string.IsNullOrWhiteSpace(ppageId) ? "356753938,823673182,967485191" : ppageId,
                 ["cdnBackup"] = "1",
                 ["module"] = "",
                 ["clientver"] = "11430"
             },
             SpecificRouter = "trackercdn.kugou.com",
             SignatureType = SignatureType.V5,
-            SpecificDfid = KgUtils.RandomString(24)
+            SpecificDfid = dfid
         });
     }
 

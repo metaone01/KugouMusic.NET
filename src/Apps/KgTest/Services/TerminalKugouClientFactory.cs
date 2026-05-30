@@ -42,7 +42,7 @@ internal static class TerminalKugouClientFactory
             Login = new LoginClient(rawLogin, sessionManager, NullLogger<LoginClient>.Instance),
             Recommend = new RecommendClient(rawDiscovery, sessionManager),
             Search = new SearchClient(rawSearch, sessionManager),
-            Song = new SongClient(rawSong, rawSearch),
+            Song = new SongClient(rawSong),
             Playlist = new PlaylistClient(rawPlaylist, sessionManager),
             User = new UserClient(rawUser, sessionManager),
             Lyric = new LyricClient(rawLyric),

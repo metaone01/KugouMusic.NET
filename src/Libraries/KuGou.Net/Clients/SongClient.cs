@@ -6,7 +6,7 @@ using KuGou.Net.util;
 
 namespace KuGou.Net.Clients;
 
-public class SongClient(RawSongApi rawApi, RawSearchApi rawSearchApi)
+public class SongClient(RawSongApi rawApi)
 {
     public Task<JsonElement> GetAudioAsync(string hash)
     {
@@ -83,9 +83,15 @@ public class SongClient(RawSongApi rawApi, RawSearchApi rawSearchApi)
         return rawApi.GetAudioImagesAsync(hash, audioIds, albumAudioIds, fileNames, count);
     }
 
-    public async Task<PlayUrlData?> GetPlayInfoAsync(string hash, string? quality = null)
+    public async Task<PlayUrlData?> GetPlayInfoAsync(
+        string hash,
+        string? quality = null,
+        string? albumId = null,
+        string? albumAudioId = null,
+        bool freePart = false,
+        string ppageId = "356753938")
     {
-        var json = await rawSearchApi.GetPlayUrlAsync(hash, quality);
+        var json = await rawApi.GetUrlAsync(hash, quality, albumId, albumAudioId, freePart, ppageId);
         var result = json.Deserialize(AppJsonContext.Default.PlayUrlData);
         return result ?? new PlayUrlData { Status = 0 };
     }

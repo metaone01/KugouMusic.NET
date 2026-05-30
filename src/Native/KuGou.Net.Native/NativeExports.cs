@@ -84,7 +84,7 @@ public static class NativeExports
             _loginClient = new LoginClient(rawLogin, _sessionManager, NullLogger<LoginClient>.Instance);
             _registerClient = new RegisterClient(rawDevice, _sessionManager, NullLogger<RegisterClient>.Instance);
             _searchClient = new SearchClient(rawSearch, _sessionManager);
-            _songClient = new SongClient(rawSong, rawSearch);
+            _songClient = new SongClient(rawSong);
             _artistClient = new ArtistClient(rawArtist, rawSearch, _sessionManager);
             _playlistClient = new PlaylistClient(rawPlaylist, _sessionManager);
             _userClient = new UserClient(rawUser, _sessionManager);

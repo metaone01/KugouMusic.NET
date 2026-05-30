@@ -239,7 +239,7 @@ public class SongController(SongClient songClient) : ControllerBase
         [FromQuery(Name = "album_audio_id")] string? albumAudioId = null,
         [FromQuery(Name = "free_part")] bool freePart = false)
     {
-        var result = await songClient.GetPlayInfoAsync(hash, quality);
+        var result = await songClient.GetPlayInfoAsync(hash, quality, albumId, albumAudioId, freePart);
         return this.FromKgStatus(result);
     }
 }
