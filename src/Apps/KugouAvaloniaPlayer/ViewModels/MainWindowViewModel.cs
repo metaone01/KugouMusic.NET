@@ -643,7 +643,7 @@ public partial class MainWindowViewModel : ObservableObject
             else if (ActivePage is SearchViewModel searchVm)
                 currentSongList = searchVm.IsShowingDetail ? searchVm.DetailSongs : searchVm.Songs;
             else if (ActivePage is SingerViewModel singerVm)
-                currentSongList = singerVm.Songs;
+                currentSongList = singerVm.IsAlbumDetailVisible ? singerVm.AlbumSongs : singerVm.Songs;
             else if (ActivePage is RankViewModel rankVm && rankVm.IsShowingSongs)
                 currentSongList = rankVm.SelectedRankSongs;
             else if (ActivePage is HistoryViewModel historyVm)
