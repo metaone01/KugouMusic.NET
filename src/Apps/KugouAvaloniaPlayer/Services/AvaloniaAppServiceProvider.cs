@@ -52,6 +52,7 @@ namespace KugouAvaloniaPlayer.Services;
 [Transient<DailyRecommendViewModel>]
 [Transient<HistoryViewModel>]
 [Transient<DiscoverViewModel>]
+[Transient<LocalMusicLibraryViewModel>]
 [Transient<MyPlaylistsViewModel>]
 [Transient<EqSettingsViewModel>]
 [Transient<RankViewModel>]
@@ -99,6 +100,7 @@ public interface IAvaloniaAppServiceModule;
 [Singleton<ILogger<PlayerViewModel>>(Factory = nameof(CreatePlayerViewModelLogger))]
 [Singleton<ILogger<NowPlayingViewModel>>(Factory = nameof(CreateNowPlayingViewModelLogger))]
 [Singleton<ILogger<DiscoverViewModel>>(Factory = nameof(CreateDiscoverViewModelLogger))]
+[Singleton<ILogger<LocalMusicLibraryViewModel>>(Factory = nameof(CreateLocalMusicLibraryViewModelLogger))]
 [Singleton<ILogger<MyPlaylistsViewModel>>(Factory = nameof(CreateMyPlaylistsViewModelLogger))]
 [Singleton<ILogger<MainWindowViewModel>>(Factory = nameof(CreateMainWindowViewModelLogger))]
 [Singleton<ILogger<DailyRecommendViewModel>>(Factory = nameof(CreateDailyRecommendViewModelLogger))]
@@ -159,6 +161,7 @@ public sealed partial class AvaloniaAppServiceProvider
     public ILogger<PlayerViewModel> CreatePlayerViewModelLogger() => LoggerFactory.CreateLogger<PlayerViewModel>();
     public ILogger<NowPlayingViewModel> CreateNowPlayingViewModelLogger() => LoggerFactory.CreateLogger<NowPlayingViewModel>();
     public ILogger<DiscoverViewModel> CreateDiscoverViewModelLogger() => LoggerFactory.CreateLogger<DiscoverViewModel>();
+    public ILogger<LocalMusicLibraryViewModel> CreateLocalMusicLibraryViewModelLogger() => LoggerFactory.CreateLogger<LocalMusicLibraryViewModel>();
     public ILogger<MyPlaylistsViewModel> CreateMyPlaylistsViewModelLogger() => LoggerFactory.CreateLogger<MyPlaylistsViewModel>();
     public ILogger<MainWindowViewModel> CreateMainWindowViewModelLogger() => LoggerFactory.CreateLogger<MainWindowViewModel>();
     public ILogger<DailyRecommendViewModel> CreateDailyRecommendViewModelLogger() => LoggerFactory.CreateLogger<DailyRecommendViewModel>();

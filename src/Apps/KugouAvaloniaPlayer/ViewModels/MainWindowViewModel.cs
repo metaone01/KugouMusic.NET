@@ -55,9 +55,6 @@ public partial class MainWindowViewModel : ObservableObject
     public partial bool IsAlbumPlaylistsExpanded { get; set; }
 
     [ObservableProperty]
-    public partial bool IsLocalPlaylistsExpanded { get; set; }
-
-    [ObservableProperty]
     public partial bool IsMiniPlayerOpaque { get; set; } = true;
 
     private bool _isUpdatingActivePageFromNavigation;
@@ -93,6 +90,7 @@ public partial class MainWindowViewModel : ObservableObject
         DailyRecommendViewModel dailyRecommendViewModel,
         HistoryViewModel historyViewModel,
         DiscoverViewModel discoverViewModel,
+        LocalMusicLibraryViewModel localMusicLibraryViewModel,
         MyPlaylistsViewModel myPlaylistsViewModel,
         ILogger<MainWindowViewModel> logger)
     {
@@ -122,6 +120,7 @@ public partial class MainWindowViewModel : ObservableObject
 
         Pages.Add(_dailyRecommendViewModel);
         Pages.Add(historyViewModel);
+        Pages.Add(localMusicLibraryViewModel);
         Pages.Add(discoverViewModel);
         Pages.Add(rankViewModel);
         Pages.Add(_searchViewModel);
@@ -238,7 +237,6 @@ public partial class MainWindowViewModel : ObservableObject
     public MyPlaylistsViewModel PlaylistsViewModel { get; }
 
     public AvaloniaList<PlaylistItem> SidebarOnlinePlaylists { get; } = new();
-    public AvaloniaList<PlaylistItem> SidebarLocalPlaylists { get; } = new();
     public AvaloniaList<PlaylistItem> SidebarAlbumPlaylists { get; } = new();
 
     private void OnDesktopLyricWindowStateChanged(bool isOpen)
@@ -258,7 +256,6 @@ public partial class MainWindowViewModel : ObservableObject
             return;
 
         IsAlbumPlaylistsExpanded = false;
-        IsLocalPlaylistsExpanded = false;
     }
 
     partial void OnIsAlbumPlaylistsExpandedChanged(bool value)
@@ -267,16 +264,6 @@ public partial class MainWindowViewModel : ObservableObject
             return;
 
         IsOnlinePlaylistsExpanded = false;
-        IsLocalPlaylistsExpanded = false;
-    }
-
-    partial void OnIsLocalPlaylistsExpandedChanged(bool value)
-    {
-        if (!value)
-            return;
-
-        IsOnlinePlaylistsExpanded = false;
-        IsAlbumPlaylistsExpanded = false;
     }
 
     partial void OnActivePageChanged(PageViewModelBase value)
@@ -548,13 +535,6 @@ public partial class MainWindowViewModel : ObservableObject
         await PlaylistsViewModel.OpenPlaylistCommand.ExecuteAsync(item);
     }
 
-    [RelayCommand]
-    private void OpenLocalLibrary()
-    {
-        NavigateToPage(PlaylistsViewModel);
-        PlaylistsViewModel.OpenLocalLibraryHomeCommand.Execute(null);
-    }
-
     private void OnPlaylistViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(MyPlaylistsViewModel.SelectedPlaylist))
@@ -572,8 +552,6 @@ public partial class MainWindowViewModel : ObservableObject
 
         foreach (var item in SidebarOnlinePlaylists)
             item.IsSelected = IsSameItem(selected, item);
-        foreach (var item in SidebarLocalPlaylists)
-            item.IsSelected = IsSameItem(selected, item);
         foreach (var item in SidebarAlbumPlaylists)
             item.IsSelected = IsSameItem(selected, item);
     }
@@ -585,7 +563,6 @@ public partial class MainWindowViewModel : ObservableObject
 
         return a.Type switch
         {
-            PlaylistType.Local => string.Equals(a.Id, b.Id, StringComparison.OrdinalIgnoreCase),
             PlaylistType.Online or PlaylistType.Album => a.ListId > 0 && b.ListId > 0
                 ? a.ListId == b.ListId
                 : string.Equals(a.Id, b.Id, StringComparison.OrdinalIgnoreCase),
@@ -596,7 +573,6 @@ public partial class MainWindowViewModel : ObservableObject
     private void RefreshSidebarPlaylists()
     {
         SidebarOnlinePlaylists.Clear();
-        SidebarLocalPlaylists.Clear();
         SidebarAlbumPlaylists.Clear();
 
         SidebarOnlinePlaylists.AddRange(PlaylistsViewModel.Items.Where(x => x.Type == PlaylistType.Online));
@@ -638,6 +614,8 @@ public partial class MainWindowViewModel : ObservableObject
                 currentSongList = dailyVm.Songs;
             else if (ActivePage is MyPlaylistsViewModel playlistVm && playlistVm.IsShowingSongs)
                 currentSongList = playlistVm.SelectedPlaylistSongs;
+            else if (ActivePage is LocalMusicLibraryViewModel localMusicVm && localMusicVm.IsShowingSongs)
+                currentSongList = localMusicVm.SelectedPlaylistSongs;
             else if (ActivePage is DiscoverViewModel discoverVm && discoverVm.IsShowingSongs)
                 currentSongList = discoverVm.SelectedPlaylistSongs;
             else if (ActivePage is SearchViewModel searchVm)

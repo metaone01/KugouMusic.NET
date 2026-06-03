@@ -73,6 +73,10 @@
             <DependentUpon>MyPlaylistsView.axaml</DependentUpon>
             <SubType>Code</SubType>
         </Compile>
+        <Compile Update="Views\LocalMusicLibraryView.axaml.cs">
+            <DependentUpon>LocalMusicLibraryView.axaml</DependentUpon>
+            <SubType>Code</SubType>
+        </Compile>
         <Compile Update="Views\DailyRecommendView.axaml.cs">
             <DependentUpon>DailyRecommendView.axaml</DependentUpon>
             <SubType>Code</SubType>

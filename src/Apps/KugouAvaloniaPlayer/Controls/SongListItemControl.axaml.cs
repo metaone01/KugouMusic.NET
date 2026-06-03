@@ -93,7 +93,8 @@ public partial class SongListItemControl : UserControl
             return;
 
         var playlistsViewModel = FindPlaylistsViewModel();
-        if (playlistsViewModel?.IsLocalPlaylist == true)
+        var localMusicLibraryViewModel = FindLocalMusicLibraryViewModel();
+        if (localMusicLibraryViewModel?.IsLocalPlaylist == true)
         {
             flyout.Items.Add(new MenuItem
             {
@@ -139,6 +140,17 @@ public partial class SongListItemControl : UserControl
         foreach (var ancestor in this.GetVisualAncestors())
         {
             if (ancestor is Control { DataContext: MyPlaylistsViewModel viewModel })
+                return viewModel;
+        }
+
+        return null;
+    }
+
+    private LocalMusicLibraryViewModel? FindLocalMusicLibraryViewModel()
+    {
+        foreach (var ancestor in this.GetVisualAncestors())
+        {
+            if (ancestor is Control { DataContext: LocalMusicLibraryViewModel viewModel })
                 return viewModel;
         }
 

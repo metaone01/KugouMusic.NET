@@ -6,6 +6,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Avalonia.Media.Imaging;
 using KugouAvaloniaPlayer.Models;
 using KugouAvaloniaPlayer.Services.Jellyfin;
 using Microsoft.Data.Sqlite;
@@ -60,6 +61,9 @@ public sealed class LocalMusicLibraryService(
     private const string PlaylistKindImportedFolder = "ImportedFolder";
     private const string PlaylistKindJellyfinLibrary = "JellyfinLibrary";
     private const string SourceTypeLocalFile = "LocalFile";
+    private const string EmbeddedCoverCacheVersion = "thumb-v1";
+    private const int EmbeddedCoverThumbnailWidth = 512;
+    private const int EmbeddedCoverJpegQuality = 86;
     public const string SourceTypeJellyfin = "Jellyfin";
 
     private static readonly string LocalSongCoverCacheDirectory = Path.Combine(
@@ -1225,12 +1229,12 @@ public sealed class LocalMusicLibraryService(
         {
             Directory.CreateDirectory(LocalSongCoverCacheDirectory);
 
-            var extension = GetPictureExtension(picture.MimeType);
-            var cacheKey = GetStableHash($"{songPath}|{System.IO.File.GetLastWriteTimeUtc(songPath).Ticks}|{picture.Data.Count}");
-            var cachePath = Path.Combine(LocalSongCoverCacheDirectory, $"{cacheKey}{extension}");
+            var cacheKey = GetStableHash(
+                $"{EmbeddedCoverCacheVersion}|{songPath}|{System.IO.File.GetLastWriteTimeUtc(songPath).Ticks}|{picture.Data.Count}");
+            var cachePath = Path.Combine(LocalSongCoverCacheDirectory, $"{cacheKey}.jpg");
 
             if (!System.IO.File.Exists(cachePath))
-                System.IO.File.WriteAllBytes(cachePath, picture.Data.Data);
+                WriteEmbeddedCoverThumbnail(picture, cachePath);
 
             return cachePath;
         }
@@ -1240,16 +1244,15 @@ public sealed class LocalMusicLibraryService(
         }
     }
 
-    private static string GetPictureExtension(string? mimeType)
+    private static void WriteEmbeddedCoverThumbnail(IPicture picture, string cachePath)
     {
-        return mimeType?.ToLowerInvariant() switch
-        {
-            "image/png" => ".png",
-            "image/gif" => ".gif",
-            "image/bmp" => ".bmp",
-            "image/webp" => ".webp",
-            _ => ".jpg"
-        };
+        using var input = new MemoryStream(picture.Data.Data, writable: false);
+        using var bitmap = Bitmap.DecodeToWidth(
+            input,
+            EmbeddedCoverThumbnailWidth,
+            BitmapInterpolationMode.HighQuality);
+
+        bitmap.Save(cachePath, EmbeddedCoverJpegQuality);
     }
 
     private static string GetStableHash(string value)
