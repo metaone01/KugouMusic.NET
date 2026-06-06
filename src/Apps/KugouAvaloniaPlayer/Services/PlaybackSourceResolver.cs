@@ -1,12 +1,15 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using KuGou.Net.Abstractions.Models;
 using KuGou.Net.Clients;
 using KuGou.Net.Protocol.Session;
 using KugouAvaloniaPlayer.Services.Jellyfin;
 using KugouAvaloniaPlayer.ViewModels;
+using Microsoft.Extensions.Logging;
 
 namespace KugouAvaloniaPlayer.Services;
 
@@ -18,9 +21,12 @@ public interface IPlaybackSourceResolver
 public sealed class PlaybackSourceResolver(
     SongClient songClient,
     KgSessionManager sessionManager,
-    IJellyfinClient jellyfinClient)
+    IJellyfinClient jellyfinClient,
+    ILogger<PlaybackSourceResolver> logger)
     : IPlaybackSourceResolver
 {
+    private static readonly string[] QualityPriority = ["128", "320", "flac", "high"];
+
     public async Task<PlaybackSourceResult> ResolveAsync(
         SongItem song,
         string quality,
@@ -44,7 +50,8 @@ public sealed class PlaybackSourceResolver(
             return PlaybackSourceResult.Failed(PlaybackSourceFailureReason.LoginRequired);
 
         cancellationToken.ThrowIfCancellationRequested();
-        var playData = await songClient.GetPlayInfoAsync(song.Hash, quality);
+        var effectiveQuality = await ResolvePlaybackQualityAsync(song, quality, cancellationToken);
+        var playData = await songClient.GetPlayInfoAsync(song.Hash, effectiveQuality, song.AlbumId);
         cancellationToken.ThrowIfCancellationRequested();
 
         if (playData == null || playData.Status != 1)
@@ -54,6 +61,74 @@ public sealed class PlaybackSourceResolver(
         return string.IsNullOrWhiteSpace(url)
             ? PlaybackSourceResult.Failed(PlaybackSourceFailureReason.EmptyUrl)
             : PlaybackSourceResult.Remote(url);
+    }
+
+    private async Task<string> ResolvePlaybackQualityAsync(
+        SongItem song,
+        string requestedQuality,
+        CancellationToken cancellationToken)
+    {
+        var requestedRank = GetQualityRank(requestedQuality);
+        if (requestedRank < 0 || string.IsNullOrWhiteSpace(song.Hash))
+            return requestedQuality;
+
+        var privileges = await songClient.GetPrivilegeLiteAsync(song.Hash, song.AlbumId);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (privileges == null || privileges.Count == 0)
+            return requestedQuality;
+
+        var highestSupportedQuality = EnumerateSupportedQualities(privileges)
+            .Select(GetQualityRank)
+            .Where(rank => rank >= 0)
+            .DefaultIfEmpty(-1)
+            .Max();
+
+        if (highestSupportedQuality < 0 || highestSupportedQuality >= requestedRank)
+            return requestedQuality;
+
+        var effectiveQuality = QualityPriority[highestSupportedQuality];
+        logger.LogInformation(
+            "Playback quality downgraded for song {SongName} ({Hash}) from {RequestedQuality} to {EffectiveQuality}",
+            song.Name,
+            song.Hash,
+            requestedQuality,
+            effectiveQuality);
+
+        return effectiveQuality;
+    }
+
+    private static IEnumerable<string> EnumerateSupportedQualities(IEnumerable<PrivilegeLiteData> privileges)
+    {
+        var stack = new Stack<PrivilegeLiteData>(privileges);
+        var yielded = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        while (stack.Count > 0)
+        {
+            var current = stack.Pop();
+            if (current.RelateGoods.Count > 0)
+            {
+                foreach (var relateGood in current.RelateGoods)
+                    stack.Push(relateGood);
+            }
+
+            var normalizedQuality = NormalizeQuality(current.Quality);
+            if (GetQualityRank(normalizedQuality) < 0 || !yielded.Add(normalizedQuality))
+                continue;
+
+            yield return normalizedQuality;
+        }
+    }
+
+    private static int GetQualityRank(string? quality)
+    {
+        var normalizedQuality = NormalizeQuality(quality);
+        return Array.FindIndex(QualityPriority,
+            candidate => string.Equals(candidate, normalizedQuality, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string NormalizeQuality(string? quality)
+    {
+        return quality?.Trim().ToLowerInvariant() ?? string.Empty;
     }
 
     private static bool IsHttpUrl(string? value)

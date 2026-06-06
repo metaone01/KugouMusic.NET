@@ -111,6 +111,7 @@ public interface IAvaloniaAppServiceModule;
 [Singleton<ILogger<GitHubReleaseService>>(Factory = nameof(CreateGitHubReleaseServiceLogger))]
 [Singleton<ILogger<GlobalShortcutServiceImpl>>(Factory = nameof(CreateGlobalShortcutServiceLogger))]
 [Singleton<ILogger<LyricsService>>(Factory = nameof(CreateLyricsServiceLogger))]
+[Singleton<ILogger<PlaybackSourceResolver>>(Factory = nameof(CreatePlaybackSourceResolverLogger))]
 [Singleton<ILogger<PlaybackCoordinator>>(Factory = nameof(CreatePlaybackCoordinatorLogger))]
 [Singleton<ILogger<PlaybackAudioEffectsService>>(Factory = nameof(CreatePlaybackAudioEffectsServiceLogger))]
 [Singleton<ILogger<PersonalFmService>>(Factory = nameof(CreatePersonalFmServiceLogger))]
@@ -172,6 +173,7 @@ public sealed partial class AvaloniaAppServiceProvider
     public ILogger<GitHubReleaseService> CreateGitHubReleaseServiceLogger() => LoggerFactory.CreateLogger<GitHubReleaseService>();
     public ILogger<GlobalShortcutServiceImpl> CreateGlobalShortcutServiceLogger() => LoggerFactory.CreateLogger<GlobalShortcutServiceImpl>();
     public ILogger<LyricsService> CreateLyricsServiceLogger() => LoggerFactory.CreateLogger<LyricsService>();
+    public ILogger<PlaybackSourceResolver> CreatePlaybackSourceResolverLogger() => LoggerFactory.CreateLogger<PlaybackSourceResolver>();
     public ILogger<PlaybackCoordinator> CreatePlaybackCoordinatorLogger() => LoggerFactory.CreateLogger<PlaybackCoordinator>();
     public ILogger<PlaybackAudioEffectsService> CreatePlaybackAudioEffectsServiceLogger() => LoggerFactory.CreateLogger<PlaybackAudioEffectsService>();
     public ILogger<PersonalFmService> CreatePersonalFmServiceLogger() => LoggerFactory.CreateLogger<PersonalFmService>();

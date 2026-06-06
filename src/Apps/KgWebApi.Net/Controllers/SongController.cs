@@ -159,6 +159,7 @@ public class SongController(SongClient songClient) : ControllerBase
     /// <param name="albumIds">专辑 id。</param>
     /// <returns>音乐详情。</returns>
     [HttpGet("/privilege/lite")]
+    [ProducesResponseType(typeof(List<PrivilegeLiteData>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetPrivilegeLite(
         [FromQuery][Required(AllowEmptyStrings = false)] string hash,
         [FromQuery(Name = "album_id")] string? albumIds = null)
