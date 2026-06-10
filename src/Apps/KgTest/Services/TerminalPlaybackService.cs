@@ -1,3 +1,4 @@
+using KuGou.Net.Abstractions;
 using KuGou.Net.Clients;
 using KgTest.Models;
 using SimpleAudio;
@@ -208,13 +209,7 @@ internal sealed class TerminalPlaybackService : IDisposable
 
     public void CycleQuality()
     {
-        _settings.MusicQuality = _settings.MusicQuality switch
-        {
-            "128" => "320",
-            "320" => "flac",
-            "flac" => "high",
-            _ => "128"
-        };
+        _settings.MusicQuality = AudioQuality.GetNext(_settings.MusicQuality);
         ResetTransitionPipeline(cancelPreparedTrack: true);
         StatusMessage = $"音质已切换到 {_settings.MusicQuality}";
         _settingsStore.Save(_settings);

@@ -1,6 +1,7 @@
 using System;
 using System.Globalization;
 using Avalonia.Data.Converters;
+using KuGou.Net.Abstractions;
 
 namespace KugouAvaloniaPlayer.Converters;
 
@@ -10,10 +11,10 @@ public sealed class PlaybackQualityDisplayConverter : IValueConverter
     {
         return value?.ToString()?.ToLowerInvariant() switch
         {
-            "128" => "标准",
-            "320" => "高品",
-            "flac" => "无损",
-            "high" => "Hi-Res",
+            AudioQuality.Standard => "标准",
+            AudioQuality.High => "高品",
+            AudioQuality.Lossless => "无损",
+            AudioQuality.HiRes => "Hi-Res",
             null or "" => "标准",
             var other => other
         };
@@ -23,11 +24,11 @@ public sealed class PlaybackQualityDisplayConverter : IValueConverter
     {
         return value?.ToString() switch
         {
-            "标准" => "128",
-            "高品" => "320",
-            "无损" => "flac",
-            "Hi-Res" => "high",
-            var other => other ?? "128"
+            "标准" => AudioQuality.Standard,
+            "高品" => AudioQuality.High,
+            "无损" => AudioQuality.Lossless,
+            "Hi-Res" => AudioQuality.HiRes,
+            var other => other ?? AudioQuality.Default
         };
     }
 }

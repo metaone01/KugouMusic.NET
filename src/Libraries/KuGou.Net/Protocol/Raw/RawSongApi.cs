@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using KuGou.Net.Abstractions;
 using KuGou.Net.Infrastructure.Http;
 using KuGou.Net.Protocol.Session;
 using KuGou.Net.Protocol.Transport;
@@ -261,7 +262,8 @@ public class RawSongApi(IKgTransport transport, KgSessionManager sessionManager)
                 ["relate"] = 1,
                 ["support_verify"] = 1,
                 ["resource"] = resource,
-                ["qualities"] = new JsonArray("128", "320", "flac", "high", "viper_atmos", "viper_tape",
+                ["qualities"] = new JsonArray(AudioQuality.Standard, AudioQuality.High, AudioQuality.Lossless,
+                    AudioQuality.HiRes, "viper_atmos", "viper_tape",
                     "viper_clear", "super", "multitrack")
             },
             SpecificRouter = "media.store.kugou.com",
@@ -338,7 +340,8 @@ public class RawSongApi(IKgTransport transport, KgSessionManager sessionManager)
         {
             ["area_code"] = "1",
             ["behavior"] = "play",
-            ["qualities"] = new JsonArray("128", "320", "flac", "high", "multitrack", "viper_atmos", "viper_tape",
+            ["qualities"] = new JsonArray(AudioQuality.Standard, AudioQuality.High, AudioQuality.Lossless,
+                AudioQuality.HiRes, "multitrack", "viper_atmos", "viper_tape",
                 "viper_clear", "super"),
             ["resource"] = new JsonObject
             {
@@ -381,14 +384,14 @@ public class RawSongApi(IKgTransport transport, KgSessionManager sessionManager)
         });
     }
 
-    public Task<JsonElement> GetUrlAsync(string hash, string? quality = "128", string? albumId = null,
+    public Task<JsonElement> GetUrlAsync(string hash, string? quality = AudioQuality.Default, string? albumId = null,
         string? albumAudioId = null, bool freePart = false, string? ppageId = null)
     {
         var session = sessionManager.Session;
         var dfid = string.IsNullOrWhiteSpace(session.Dfid) || session.Dfid == "-" ? KgUtils.RandomString(24) : session.Dfid;
         var normalizedQuality = quality is "piano" or "acappella" or "subwoofer" or "ancient" or "dj" or "surnay"
             ? $"magic_{quality}"
-            : quality ?? "128";
+            : quality ?? AudioQuality.Default;
 
         return transport.SendAsync(new KgRequest
         {

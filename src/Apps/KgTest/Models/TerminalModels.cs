@@ -1,3 +1,5 @@
+using KuGou.Net.Abstractions;
+
 namespace KgTest.Models;
 
 internal enum TerminalPage
@@ -77,7 +79,7 @@ internal sealed class PlaybackStateSnapshot
 
 internal sealed class TerminalAppSettings
 {
-    public string MusicQuality { get; set; } = "high";
+    public string MusicQuality { get; set; } = AudioQuality.HiRes;
     public float Volume { get; set; } = 0.8f;
     public bool EnableSurround { get; set; }
     public bool EnableSeamlessTransition { get; set; }

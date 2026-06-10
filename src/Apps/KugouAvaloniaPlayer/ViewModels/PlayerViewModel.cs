@@ -11,6 +11,7 @@ using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
+using KuGou.Net.Abstractions;
 using KugouAvaloniaPlayer.Models;
 using KugouAvaloniaPlayer.Services;
 using KugouAvaloniaPlayer.Services.SystemMediaSession;
@@ -105,7 +106,7 @@ public partial class PlayerViewModel : ViewModelBase, IDisposable
     private bool _isSyncingQualitySelection;
     private CancellationTokenSource? _loadCancellation;
     [ObservableProperty]
-    public partial string MusicQuality { get; set; } = "128";
+    public partial string MusicQuality { get; set; } = AudioQuality.Default;
 
     [ObservableProperty]
     public partial double NowPlayingArtworkOpacity { get; set; } = 1;
@@ -134,7 +135,7 @@ public partial class PlayerViewModel : ViewModelBase, IDisposable
     private PreparedTrack? _preparedNextTrack;
     private string? _prepareFailureSongKey;
     [ObservableProperty]
-    public partial string QualitySelection { get; set; } = "128";
+    public partial string QualitySelection { get; set; } = AudioQuality.Default;
 
     [ObservableProperty]
     public partial double TotalDurationSeconds { get; set; }
@@ -204,7 +205,7 @@ public partial class PlayerViewModel : ViewModelBase, IDisposable
         add => _visualizerService.Updated += value;
         remove => _visualizerService.Updated -= value;
     }
-    public string[] QualityOptions { get; } = ["128", "320", "flac", "high"];
+    public string[] QualityOptions { get; } = AudioQuality.Ordered.ToArray();
     public int DisplayPlaybackQueueCount => DisplayPlaybackQueue.Count;
     public bool HasDisplayPlaybackQueue => DisplayPlaybackQueue.Count > 0;
     public TimeSpan CurrentPosition => TimeSpan.FromSeconds(CurrentPositionSeconds);

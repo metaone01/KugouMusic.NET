@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using KuGou.Net.Abstractions;
 using KuGou.Net.Infrastructure.Http;
 using KuGou.Net.Protocol.Transport;
 using KuGou.Net.util;
@@ -39,7 +40,7 @@ public class RawSearchApi(IKgTransport transport)
     }
 
     // 获取播放链接
-    public async Task<JsonElement> GetPlayUrlAsync(string hash, string? quality = "128")
+    public async Task<JsonElement> GetPlayUrlAsync(string hash, string? quality = AudioQuality.Default)
     {
         var paramsDict = new Dictionary<string, string>
         {
@@ -49,7 +50,7 @@ public class RawSearchApi(IKgTransport transport)
             { "ssa_flag", "is_fromtrack" },
             { "version", KuGouConfig.Version },
             { "page_id", "967177915" },
-            { "quality", quality ?? "128" },
+            { "quality", quality ?? AudioQuality.Default },
             { "album_audio_id", "0" },
             { "behavior", "play" },
             { "pid", "411" },

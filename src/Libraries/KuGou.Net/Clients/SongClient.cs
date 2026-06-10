@@ -1,4 +1,5 @@
 using System.Text.Json;
+using KuGou.Net.Abstractions;
 using KuGou.Net.Abstractions.Models;
 using KuGou.Net.Adapters.Common;
 using KuGou.Net.Protocol.Raw;
@@ -101,7 +102,7 @@ public class SongClient(RawSongApi rawApi)
         return rawApi.GetUrlNewAsync(hash, albumAudioId, freePart);
     }
 
-    public Task<JsonElement> GetUrlAsync(string hash, string? quality = "128", string? albumId = null,
+    public Task<JsonElement> GetUrlAsync(string hash, string? quality = AudioQuality.Default, string? albumId = null,
         string? albumAudioId = null, bool freePart = false)
     {
         return rawApi.GetUrlAsync(hash, quality, albumId, albumAudioId, freePart);

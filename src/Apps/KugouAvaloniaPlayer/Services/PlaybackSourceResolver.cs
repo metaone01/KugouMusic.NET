@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using KuGou.Net.Abstractions;
 using KuGou.Net.Abstractions.Models;
 using KuGou.Net.Clients;
 using KuGou.Net.Protocol.Session;
@@ -25,8 +26,6 @@ public sealed class PlaybackSourceResolver(
     ILogger<PlaybackSourceResolver> logger)
     : IPlaybackSourceResolver
 {
-    private static readonly string[] QualityPriority = ["128", "320", "flac", "high"];
-
     public async Task<PlaybackSourceResult> ResolveAsync(
         SongItem song,
         string quality,
@@ -68,7 +67,7 @@ public sealed class PlaybackSourceResolver(
         string requestedQuality,
         CancellationToken cancellationToken)
     {
-        var requestedRank = GetQualityRank(requestedQuality);
+        var requestedRank = AudioQuality.GetRank(requestedQuality);
         if (requestedRank < 0 || string.IsNullOrWhiteSpace(song.Hash))
             return requestedQuality;
 
@@ -77,16 +76,16 @@ public sealed class PlaybackSourceResolver(
         if (privileges == null || privileges.Count == 0)
             return requestedQuality;
 
-        var highestSupportedQuality = EnumerateSupportedQualities(privileges)
-            .Select(GetQualityRank)
+        var highestSupportedQualityRank = EnumerateSupportedQualities(privileges)
+            .Select(AudioQuality.GetRank)
             .Where(rank => rank >= 0)
             .DefaultIfEmpty(-1)
             .Max();
 
-        if (highestSupportedQuality < 0 || highestSupportedQuality >= requestedRank)
+        if (highestSupportedQualityRank < 0 || highestSupportedQualityRank >= requestedRank)
             return requestedQuality;
 
-        var effectiveQuality = QualityPriority[highestSupportedQuality];
+        var effectiveQuality = AudioQuality.Ordered[highestSupportedQualityRank];
         logger.LogInformation(
             "Playback quality downgraded for song {SongName} ({Hash}) from {RequestedQuality} to {EffectiveQuality}",
             song.Name,
@@ -111,24 +110,12 @@ public sealed class PlaybackSourceResolver(
                     stack.Push(relateGood);
             }
 
-            var normalizedQuality = NormalizeQuality(current.Quality);
-            if (GetQualityRank(normalizedQuality) < 0 || !yielded.Add(normalizedQuality))
+            var normalizedQuality = AudioQuality.Normalize(current.Quality);
+            if (!AudioQuality.IsKnown(normalizedQuality) || !yielded.Add(normalizedQuality))
                 continue;
 
             yield return normalizedQuality;
         }
-    }
-
-    private static int GetQualityRank(string? quality)
-    {
-        var normalizedQuality = NormalizeQuality(quality);
-        return Array.FindIndex(QualityPriority,
-            candidate => string.Equals(candidate, normalizedQuality, StringComparison.OrdinalIgnoreCase));
-    }
-
-    private static string NormalizeQuality(string? quality)
-    {
-        return quality?.Trim().ToLowerInvariant() ?? string.Empty;
     }
 
     private static bool IsHttpUrl(string? value)

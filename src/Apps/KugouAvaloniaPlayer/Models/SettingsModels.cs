@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using KuGou.Net.Abstractions;
 
 namespace KugouAvaloniaPlayer.Models;
 
@@ -124,7 +125,7 @@ public class AppSettings
 
     public CloseBehavior CloseBehavior { get; set; } = CloseBehavior.MinimizeToTray;
     public string AppTheme { get; set; } = ThemeDefault;
-    public string MusicQuality { get; set; } = "128";
+    public string MusicQuality { get; set; } = AudioQuality.Default;
     public List<string> LocalMusicFolders { get; set; } = new();
     public Dictionary<string, LocalPlaylistMeta> LocalPlaylistMetas { get; set; } = new();
     public Dictionary<string, JellyfinServerSettings> JellyfinServers { get; set; } = new();
