@@ -10,6 +10,7 @@ using Serilog;
 namespace KugouAvaloniaPlayer.Services;
 
 [JsonSerializable(typeof(GlobalShortcutSettings))]
+[JsonSerializable(typeof(PlayMode))]
 [JsonSerializable(typeof(LyricAlignmentOption))]
 [JsonSerializable(typeof(NowPlayingLyricDisplayMode))]
 [JsonSerializable(typeof(NowPlayingBackgroundSource))]
@@ -121,6 +122,8 @@ public static class SettingsManager
         Settings.JellyfinServers ??= new Dictionary<string, JellyfinServerSettings>();
         Settings.GlobalShortcuts ??= new GlobalShortcutSettings();
         Settings.AppTheme = NormalizeAppTheme(Settings.AppTheme);
+        if (!Enum.IsDefined(Settings.PlaybackMode))
+            Settings.PlaybackMode = PlayMode.Normal;
         Settings.CustomBackgroundImagePath = string.IsNullOrWhiteSpace(Settings.CustomBackgroundImagePath)
             ? null
             : Settings.CustomBackgroundImagePath;

@@ -7,6 +7,7 @@ using Avalonia.Controls.Notifications;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Input;
 using KugouAvaloniaPlayer.Models;
+using KugouAvaloniaPlayer.Services;
 using Microsoft.Extensions.Logging;
 using SukiUI.Toasts;
 
@@ -130,14 +131,14 @@ public partial class PlayerViewModel
     private void ToggleRepeatOneMode()
     {
         _queueManager.ToggleRepeatOne(CurrentPlayingSong);
-        OnPlaybackModeChanged();
+        OnPlaybackModeChanged(saveSettings: true);
     }
 
     [RelayCommand]
     private void ToggleShuffleMode()
     {
         _queueManager.ToggleShuffle(CurrentPlayingSong);
-        OnPlaybackModeChanged();
+        OnPlaybackModeChanged(saveSettings: true);
     }
 
     public PlayMode CurrentPlayMode =>
@@ -147,6 +148,16 @@ public partial class PlayerViewModel
 
     [RelayCommand]
     private void SetPlayMode(PlayMode mode)
+    {
+        ApplyPlayMode(mode, saveSettings: true);
+    }
+
+    public void ApplySavedPlaybackModePreference()
+    {
+        ApplyPlayMode(SettingsManager.Settings.PlaybackMode, saveSettings: false);
+    }
+
+    private void ApplyPlayMode(PlayMode mode, bool saveSettings)
     {
         if (mode == CurrentPlayMode)
             return;
@@ -167,15 +178,21 @@ public partial class PlayerViewModel
                 break;
         }
 
-        OnPlaybackModeChanged();
+        OnPlaybackModeChanged(saveSettings);
     }
 
-    private void OnPlaybackModeChanged()
+    private void OnPlaybackModeChanged(bool saveSettings)
     {
         ResetTransitionPipeline(true);
         OnPropertyChanged(nameof(IsRepeatOneMode));
         OnPropertyChanged(nameof(IsShuffleMode));
         OnPropertyChanged(nameof(CurrentPlayMode));
+
+        if (!saveSettings)
+            return;
+
+        SettingsManager.Settings.PlaybackMode = CurrentPlayMode;
+        SettingsManager.Save();
     }
 
     [RelayCommand]

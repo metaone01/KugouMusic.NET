@@ -126,6 +126,7 @@ public class AppSettings
     public CloseBehavior CloseBehavior { get; set; } = CloseBehavior.MinimizeToTray;
     public string AppTheme { get; set; } = ThemeDefault;
     public string MusicQuality { get; set; } = AudioQuality.Default;
+    public PlayMode PlaybackMode { get; set; } = PlayMode.Normal;
     public List<string> LocalMusicFolders { get; set; } = new();
     public Dictionary<string, LocalPlaylistMeta> LocalPlaylistMetas { get; set; } = new();
     public Dictionary<string, JellyfinServerSettings> JellyfinServers { get; set; } = new();
@@ -159,6 +160,7 @@ public class AppSettings
     public double DesktopLyricFontSize { get; set; } = 30;
     public bool DesktopLyricShowTranslation { get; set; } = true;
     public bool DesktopLyricDoubleLineEnabled { get; set; }
+    public bool OpenDesktopLyricOnStartup { get; set; }
 
     public bool PlayPageLyricUseCustomMainColor { get; set; }
     public string PlayPageLyricCustomMainColor { get; set; } = "#FFFFFFFF";

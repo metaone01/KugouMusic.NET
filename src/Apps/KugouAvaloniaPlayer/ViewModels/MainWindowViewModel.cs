@@ -66,6 +66,7 @@ public partial class MainWindowViewModel : ObservableObject
 
     private bool _isUpdatingActivePageFromNavigation;
     private bool _isUpdatingSelectedMenuPageFromNavigation;
+    private bool _isClosingDesktopLyricForShutdown;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SearchCommand))]
@@ -185,6 +186,23 @@ public partial class MainWindowViewModel : ObservableObject
                 _logger.LogError(ex, "启动后台初始化任务失败");
             }
         });
+
+        _ = ApplyDeferredStartupPreferencesAsync();
+    }
+
+    private async Task ApplyDeferredStartupPreferencesAsync()
+    {
+        await Task.Delay(TimeSpan.FromMilliseconds(800));
+
+        Dispatcher.UIThread.Post(() =>
+        {
+            var savedPlaybackMode = SettingsManager.Settings.PlaybackMode;
+            if (savedPlaybackMode != PlayMode.Normal)
+                Player.ApplySavedPlaybackModePreference();
+
+            if (SettingsManager.Settings.OpenDesktopLyricOnStartup && !_desktopLyricWindowService.IsOpen)
+                _desktopLyricWindowService.Toggle();
+        });
     }
 
     private void ApplyCustomBackgroundImage(
@@ -293,6 +311,12 @@ public partial class MainWindowViewModel : ObservableObject
 
     private void OnDesktopLyricWindowStateChanged(bool isOpen)
     {
+        if (!_isClosingDesktopLyricForShutdown)
+        {
+            SettingsManager.Settings.OpenDesktopLyricOnStartup = isOpen;
+            SettingsManager.Save();
+        }
+
         if (Dispatcher.UIThread.CheckAccess())
         {
             IsDesktopLyricEnabled = isOpen;
@@ -658,6 +682,8 @@ public partial class MainWindowViewModel : ObservableObject
     [RelayCommand]
     private void ToggleDesktopLyric()
     {
+        SettingsManager.Settings.OpenDesktopLyricOnStartup = !_desktopLyricWindowService.IsOpen;
+        SettingsManager.Save();
         _desktopLyricWindowService.Toggle();
     }
 
@@ -675,6 +701,7 @@ public partial class MainWindowViewModel : ObservableObject
 
     public void ForceCloseDesktopLyric()
     {
+        _isClosingDesktopLyricForShutdown = true;
         _desktopLyricWindowService.Close();
     }
 
