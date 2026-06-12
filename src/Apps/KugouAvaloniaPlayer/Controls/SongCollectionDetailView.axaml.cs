@@ -145,12 +145,14 @@ public partial class SongCollectionDetailView : UserControl
     {
         PlayFirstSongCommand = new RelayCommand(PlayFirstSong);
         AddLoadedSongsToQueueCommand = new RelayCommand(AddLoadedSongsToQueue);
+        ScrollToPlayingSongCommand = new RelayCommand(ScrollToPlayingSong);
         InitializeComponent();
         UpdateCurrentHeroBackground();
     }
 
     public ICommand PlayFirstSongCommand { get; }
     public ICommand AddLoadedSongsToQueueCommand { get; }
+    public ICommand ScrollToPlayingSongCommand { get; }
 
     public string? Cover
     {
@@ -449,6 +451,15 @@ public partial class SongCollectionDetailView : UserControl
     {
         var loadedSongs = Songs?.AsValueEnumerable().OfType<SongItem>().ToList() ?? [];
         WeakReferenceMessenger.Default.Send(new AddLoadedSongsToQueueMessage(loadedSongs));
+    }
+
+    private void ScrollToPlayingSong()
+    {
+        var playingSong = Songs?.AsValueEnumerable().OfType<SongItem>().FirstOrDefault(song => song.IsPlaying);
+        if (playingSong is null)
+            return;
+
+        SongList.ScrollIntoView(playingSong);
     }
 
     private void UpdateHeroActionState()

@@ -71,7 +71,7 @@ public sealed partial class GlobalShortcutService
 
         var hotKeyId = wParam.ToInt32();
 
-        foreach (var pair in _registeredIds.Where(pair => pair.Value == hotKeyId))
+        foreach (var pair in _registeredIds.AsValueEnumerable().Where(pair => pair.Value == hotKeyId))
         {
             handled = true;
             DispatchAction(pair.Key);
