@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
+using ZLinq;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Controls.Notifications;
@@ -21,6 +22,7 @@ public partial class PlayerViewModel
             return;
 
         SyncDisplayPlaybackQueue();
+        SchedulePlaybackQueueCacheSave();
     }
 
     private void SyncDisplayPlaybackQueue()
@@ -97,6 +99,12 @@ public partial class PlayerViewModel
         }
         else
         {
+            if (_player.IsStopped && CurrentPlayingSong != null)
+            {
+                _ = PlaySongAsync(CurrentPlayingSong);
+                return;
+            }
+
             _player.Play();
             IsPlayingAudio = true;
             _playbackTimer.Start();
@@ -201,6 +209,7 @@ public partial class PlayerViewModel
         ClearPersonalFmSession();
         _queueManager.Clear();
         StopAndReset();
+        SchedulePlaybackQueueCacheSave();
     }
 
     [RelayCommand]
@@ -209,6 +218,8 @@ public partial class PlayerViewModel
         _queueManager.Remove(song);
         if (_queueManager.PlaybackQueue.Count == 0)
             StopAndReset();
+
+        SchedulePlaybackQueueCacheSave();
     }
 
     [RelayCommand]
@@ -237,6 +248,117 @@ public partial class PlayerViewModel
         CompleteNowPlayingLyricsTransition();
         ResetTailTelemetry();
         ResetVisualizerBars();
+    }
+
+    public async Task RestoreCachedPlaybackQueueAsync()
+    {
+        var snapshot = await Task.Run(_queueCacheService.Load);
+        if (snapshot is not { Songs.Count: > 0 })
+            return;
+
+        await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            _isRestoringCachedQueue = true;
+            try
+            {
+                _queueManager.RestoreQueue(snapshot.Songs);
+                StopAndReset();
+
+                var currentSong = ResolveCachedCurrentSong(snapshot);
+                if (currentSong == null)
+                    return;
+
+                if (CurrentPlayingSong != null)
+                    CurrentPlayingSong.IsPlaying = false;
+
+                currentSong.IsPlaying = true;
+                CurrentPlayingSong = currentSong;
+                DisplayedPlayingSong = currentSong;
+                IsLiked = _favoriteService.IsLiked(currentSong.Hash);
+                TotalDurationSeconds = currentSong.DurationSeconds;
+                CurrentPositionSeconds = 0;
+                IsPlayingAudio = false;
+                SyncDisplayPlaybackQueue();
+            }
+            finally
+            {
+                _isRestoringCachedQueue = false;
+            }
+        });
+    }
+
+    partial void OnCurrentPlayingSongChanged(SongItem? value)
+    {
+        SchedulePlaybackQueueCacheSave();
+    }
+
+    private SongItem? ResolveCachedCurrentSong(PlaybackQueueCacheSnapshot snapshot)
+    {
+        if (snapshot.Songs.Count == 0)
+            return null;
+
+        if (string.IsNullOrWhiteSpace(snapshot.CurrentSongKey))
+            return snapshot.Songs[0];
+
+        return snapshot.Songs.AsValueEnumerable().FirstOrDefault(
+                   song => string.Equals(
+                       PlaybackQueueCacheService.BuildSongKey(song),
+                       snapshot.CurrentSongKey,
+                       StringComparison.Ordinal))
+               ?? snapshot.Songs[0];
+    }
+
+    private void SchedulePlaybackQueueCacheSave()
+    {
+        if (_isRestoringCachedQueue || IsPersonalFmSessionActive)
+            return;
+
+        var previous = Interlocked.Exchange(
+            ref _queueCacheSaveCancellation,
+            new CancellationTokenSource());
+        previous?.Cancel();
+
+        var cancellation = _queueCacheSaveCancellation;
+        if (cancellation == null)
+            return;
+
+        _ = SavePlaybackQueueCacheAfterDelayAsync(cancellation);
+    }
+
+    private async Task SavePlaybackQueueCacheAfterDelayAsync(CancellationTokenSource cancellation)
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(250), cancellation.Token);
+            var songs = _queueManager.PlaybackQueue.AsValueEnumerable().ToList();
+            var currentSong = CurrentPlayingSong;
+            await Task.Run(() => _queueCacheService.Save(songs, currentSong), cancellation.Token);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        finally
+        {
+            if (ReferenceEquals(_queueCacheSaveCancellation, cancellation))
+                Interlocked.CompareExchange(ref _queueCacheSaveCancellation, null, cancellation);
+
+            cancellation.Dispose();
+        }
+    }
+
+    private void CancelAndDisposeQueueCacheSaveCancellation()
+    {
+        var cancellation = Interlocked.Exchange(ref _queueCacheSaveCancellation, null);
+        if (cancellation == null)
+            return;
+
+        try
+        {
+            cancellation.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+        }
     }
 
     private void OnPlaybackEnded()

@@ -38,6 +38,7 @@ public partial class PlayerViewModel : ViewModelBase, IDisposable
     private readonly ILogger<PlayerViewModel> _logger;
     private readonly LyricsService _lyricsService;
     private readonly PersonalFmService _personalFmService;
+    private readonly PlaybackQueueCacheService _queueCacheService;
     private readonly DispatcherTimer _playbackTimer;
     private readonly IPlaybackCoordinator _playbackCoordinator;
     private readonly IPlaybackSourceResolver _playbackSourceResolver;
@@ -45,6 +46,7 @@ public partial class PlayerViewModel : ViewModelBase, IDisposable
     private readonly PlaybackVisualizerService _visualizerService;
 
     private readonly DualTrackAudioPlayer _player;
+    private CancellationTokenSource? _queueCacheSaveCancellation;
     private readonly SemaphoreSlim _playSongLock = new(1, 1);
 
     private readonly PlaybackQueueManager _queueManager;
@@ -62,6 +64,7 @@ public partial class PlayerViewModel : ViewModelBase, IDisposable
     private int _lyricsLoadVersion;
 
     private int _consecutiveFailures;
+    private bool _isRestoringCachedQueue;
 
     [ObservableProperty]
     public partial LyricLineViewModel? CurrentLyricLine { get; set; }
@@ -146,7 +149,8 @@ public partial class PlayerViewModel : ViewModelBase, IDisposable
         ISukiToastManager toastManager, ILogger<PlayerViewModel> logger,
         PlaybackQueueManager queueManager, LyricsService lyricsService, FavoritePlaylistService favoriteService,
         PlaybackHistoryService historyService,
-        PersonalFmService personalFmService, PlaybackAudioEffectsService audioEffectsService,
+        PersonalFmService personalFmService, PlaybackQueueCacheService queueCacheService,
+        PlaybackAudioEffectsService audioEffectsService,
         PlaybackVisualizerService visualizerService,
         ITransitionAnalysisService transitionAnalysisService, IPlaybackSourceResolver playbackSourceResolver,
         IPlaybackCoordinator playbackCoordinator, ISystemMediaSessionService systemMediaSessionService)
@@ -158,6 +162,7 @@ public partial class PlayerViewModel : ViewModelBase, IDisposable
         _favoriteService = favoriteService;
         _historyService = historyService;
         _personalFmService = personalFmService;
+        _queueCacheService = queueCacheService;
         _audioEffectsService = audioEffectsService;
         _visualizerService = visualizerService;
         _transitionAnalysisService = transitionAnalysisService;
@@ -235,6 +240,7 @@ public partial class PlayerViewModel : ViewModelBase, IDisposable
         CancelAndDisposeLoadCancellation();
         CancelAndDisposeDelayedVisualSwitchCancellation();
         CancelAndDisposeTransitionCancellation();
+        CancelAndDisposeQueueCacheSaveCancellation();
         ClearPersonalFmSession();
         _playSongLock.Dispose();
         _playbackTimer.Stop();

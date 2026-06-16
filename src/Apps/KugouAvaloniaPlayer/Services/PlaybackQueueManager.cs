@@ -93,6 +93,18 @@ public class PlaybackQueueManager
         return PlaybackQueue[prevIdx];
     }
 
+    public void RestoreQueue(IReadOnlyList<SongItem> songs)
+    {
+        OriginalQueue.Clear();
+        PlaybackQueue.Clear();
+
+        if (songs.Count == 0)
+            return;
+
+        OriginalQueue.AddRange(songs);
+        PlaybackQueue.AddRange(songs);
+    }
+
     public void AddToNext(SongItem song, SongItem? currentPlaying)
     {
         PlaybackQueue.Remove(song);

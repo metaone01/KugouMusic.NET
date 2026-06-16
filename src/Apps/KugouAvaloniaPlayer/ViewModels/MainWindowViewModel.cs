@@ -193,6 +193,7 @@ public partial class MainWindowViewModel : ObservableObject
     private async Task ApplyDeferredStartupPreferencesAsync()
     {
         await Task.Delay(TimeSpan.FromMilliseconds(800));
+        await Player.RestoreCachedPlaybackQueueAsync();
 
         Dispatcher.UIThread.Post(() =>
         {
