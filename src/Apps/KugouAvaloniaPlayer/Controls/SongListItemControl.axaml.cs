@@ -33,7 +33,7 @@ public partial class SongListItemControl : UserControl
     private void ItemShell_OnContextRequested(object? sender, ContextRequestedEventArgs e)
     {
         var flyout = EnsureContextFlyout();
-        PopulateMenu(flyout, includePlaylistSpecificItems: false);
+        PopulateMenu(flyout, includePlaylistSpecificItems: true);
         flyout.ShowAt(ItemShell, showAtPointer: true);
         AttachLightDismissHandler();
         e.Handled = true;
@@ -100,6 +100,13 @@ public partial class SongListItemControl : UserControl
             {
                 Header = "设置歌曲封面",
                 Command = song.SetLocalCoverCommand,
+                CommandParameter = song
+            });
+
+            flyout.Items.Add(new MenuItem
+            {
+                Header = "从歌单移除",
+                Command = song.RemoveFromPlaylistCommand,
                 CommandParameter = song
             });
         }

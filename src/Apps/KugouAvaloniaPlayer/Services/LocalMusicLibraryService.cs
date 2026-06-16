@@ -30,6 +30,7 @@ public interface ILocalMusicLibraryService
         CancellationToken cancellationToken = default);
     Task<IReadOnlyList<LocalPlaylistSummary>> RefreshImportedLibrariesAsync(CancellationToken cancellationToken = default);
     Task AddFilesToPlaylistAsync(long playlistId, IEnumerable<string> filePaths, CancellationToken cancellationToken = default);
+    Task RemoveTrackFromPlaylistAsync(long playlistId, long trackId, CancellationToken cancellationToken = default);
     Task UpdatePlaylistAsync(long playlistId, string name, string? coverPath, CancellationToken cancellationToken = default);
     Task DeletePlaylistAsync(long playlistId, CancellationToken cancellationToken = default);
     Task SetTrackCoverAsync(long trackId, string coverPath, CancellationToken cancellationToken = default);
@@ -377,6 +378,27 @@ public sealed class LocalMusicLibraryService(
 
             await InsertPlaylistTrackAsync(connection, transaction, playlist.Id, track.Id, position + i, DateTime.UtcNow, cancellationToken);
             existingTrackIds.Add(track.Id);
+        }
+
+        playlist.UpdatedAtUtc = DateTime.UtcNow;
+        await UpdatePlaylistAsync(connection, transaction, playlist, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+    }
+
+    public async Task RemoveTrackFromPlaylistAsync(long playlistId, long trackId, CancellationToken cancellationToken = default)
+    {
+        await EnsureInitializedAsync(cancellationToken);
+        await using var connection = await AppDatabase.CreateConnectionAsync(cancellationToken);
+        var playlist = await GetPlaylistAsync(connection, null, playlistId, cancellationToken);
+        if (playlist == null)
+            return;
+
+        await using var transaction = connection.BeginTransaction();
+        var removed = await DeletePlaylistTrackAsync(connection, transaction, playlistId, trackId, cancellationToken);
+        if (removed == 0)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return;
         }
 
         playlist.UpdatedAtUtc = DateTime.UtcNow;
@@ -893,6 +915,25 @@ public sealed class LocalMusicLibraryService(
         command.CommandText = "DELETE FROM playlist_tracks WHERE playlist_id = $playlistId;";
         command.Parameters.AddWithValue("$playlistId", playlistId);
         await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private static async Task<int> DeletePlaylistTrackAsync(
+        SqliteConnection connection,
+        SqliteTransaction? transaction,
+        long playlistId,
+        long trackId,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            DELETE FROM playlist_tracks
+            WHERE playlist_id = $playlistId AND track_id = $trackId;
+            """;
+        command.Parameters.AddWithValue("$playlistId", playlistId);
+        command.Parameters.AddWithValue("$trackId", trackId);
+        return await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private static async Task<HashSet<long>> GetPlaylistTrackIdsAsync(

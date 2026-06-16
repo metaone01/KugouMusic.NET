@@ -65,6 +65,8 @@ public partial class LocalMusicLibraryViewModel : PageViewModelBase
 
         WeakReferenceMessenger.Default.Register<SetLocalSongCoverMessage>(this,
             (_, m) => _ = SetLocalSongCoverSafelyAsync(m.Song));
+        WeakReferenceMessenger.Default.Register<RemoveFromPlaylistMessage>(this,
+            (_, m) => _ = RemoveSongFromPlaylistSafelyAsync(m.Song));
         WeakReferenceMessenger.Default.Register<RefreshPlaylistsMessage>(this,
             (_, _) => _ = LoadLocalLibraryAsync());
     }
@@ -244,6 +246,38 @@ public partial class LocalMusicLibraryViewModel : PageViewModelBase
             .OfType(NotificationType.Success)
             .WithTitle("已设置封面")
             .WithContent($"已更新「{song.Name}」的本地封面")
+            .Dismiss().After(TimeSpan.FromSeconds(3))
+            .Dismiss().ByClicking()
+                .Queue();
+    }
+
+    [RelayCommand]
+    private async Task RemoveSongFromPlaylist(SongItem? song)
+    {
+        if (song == null || SelectedPlaylist?.Type != PlaylistType.Local || song.LocalTrackId <= 0)
+            return;
+
+        if (!long.TryParse(SelectedPlaylist.Id, out var playlistId))
+            return;
+
+        await _localMusicLibraryService.RemoveTrackFromPlaylistAsync(playlistId, song.LocalTrackId);
+
+        SelectedPlaylistSongs.Remove(song);
+        if (SelectedPlaylist.Count > 0)
+            SelectedPlaylist.Count--;
+        SelectedPlaylist.Subtitle = $"{SelectedPlaylist.Count} 首歌曲";
+
+        var sidebarItem = LocalLibraryPlaylists.AsValueEnumerable().FirstOrDefault(x => x.Id == SelectedPlaylist.Id);
+        if (sidebarItem != null)
+        {
+            sidebarItem.Count = SelectedPlaylist.Count;
+            sidebarItem.Subtitle = SelectedPlaylist.Subtitle;
+        }
+
+        _toastManager.CreateToast()
+            .OfType(NotificationType.Success)
+            .WithTitle("移除成功")
+            .WithContent($"已从歌单移除「{song.Name}」")
             .Dismiss().After(TimeSpan.FromSeconds(3))
             .Dismiss().ByClicking()
             .Queue();
@@ -549,6 +583,25 @@ public partial class LocalMusicLibraryViewModel : PageViewModelBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "处理设置本地歌曲封面消息失败");
+        }
+    }
+
+    private async Task RemoveSongFromPlaylistSafelyAsync(SongItem? song)
+    {
+        try
+        {
+            await RemoveSongFromPlaylist(song);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "处理从本地歌单移除歌曲消息失败");
+            _toastManager.CreateToast()
+                .OfType(NotificationType.Error)
+                .WithTitle("移除失败")
+                .WithContent(ex.Message)
+                .Dismiss().After(TimeSpan.FromSeconds(4))
+                .Dismiss().ByClicking()
+                .Queue();
         }
     }
 
