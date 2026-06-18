@@ -25,6 +25,12 @@ public class SongClient(RawSongApi rawApi)
         return rawApi.GetAudioAccompanyMatchingAsync(hash, mixId, fileName);
     }
 
+    public async Task<AudioMatchResponse?> GetAudioMatchAsync(byte[] pcmData)
+    {
+        var json = await rawApi.GetAudioMatchAsync(pcmData);
+        return json.Deserialize(AppJsonContext.Default.AudioMatchResponse);
+    }
+
     public Task<JsonElement> GetAudioKtvTotalAsync(long songId, string songHash, string singerName)
     {
         return rawApi.GetAudioKtvTotalAsync(songId, songHash, singerName);

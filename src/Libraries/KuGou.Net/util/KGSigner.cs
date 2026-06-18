@@ -1,4 +1,5 @@
 using System.Text;
+using System.Security.Cryptography;
 using ZLinq;
 
 namespace KuGou.Net.util;
@@ -33,6 +34,33 @@ public static class KgSigner
         sb.Append(salt);
 
         return KgUtils.Md5(sb.ToString());
+    }
+
+    public static string CalcPostSignature(Dictionary<string, string> queryParams, byte[] binaryBody,
+        string salt = KuGouConfig.LiteSalt)
+    {
+        using var md5 = MD5.Create();
+
+        void AppendString(string value)
+        {
+            var bytes = Encoding.UTF8.GetBytes(value);
+            md5.TransformBlock(bytes, 0, bytes.Length, null, 0);
+        }
+
+        AppendString(salt);
+
+        foreach (var kv in queryParams.AsValueEnumerable().OrderBy(x => x.Key, StringComparer.Ordinal))
+        {
+            AppendString(kv.Key);
+            AppendString("=");
+            AppendString(kv.Value);
+        }
+
+        md5.TransformBlock(binaryBody, 0, binaryBody.Length, null, 0);
+        AppendString(salt);
+        md5.TransformFinalBlock([], 0, 0);
+
+        return Convert.ToHexString(md5.Hash!).ToLowerInvariant();
     }
 
     public static string CalcLoginKey(long clienttimeMs)

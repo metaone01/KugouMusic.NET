@@ -119,6 +119,7 @@ if (app.Environment.IsDevelopment())
 app.UseSerilogRequestLogging();
 app.UseMiddleware<KgWebSessionMiddleware>();
 app.UseHttpsRedirection();
+//app.UseCors("AllowAll");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();

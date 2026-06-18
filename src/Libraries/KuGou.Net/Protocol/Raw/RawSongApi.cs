@@ -123,6 +123,43 @@ public class RawSongApi(IKgTransport transport, KgSessionManager sessionManager)
         });
     }
 
+    public Task<JsonElement> GetAudioMatchAsync(byte[] pcmData)
+    {
+        var session = sessionManager.Session;
+        var dfid = string.IsNullOrWhiteSpace(session.Dfid) ? "-" : session.Dfid;
+        var mid = KgUtils.CalcNewMid(dfid);
+        var clientTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString();
+        var parameters = new Dictionary<string, string>
+        {
+            ["appid"] = KuGouConfig.OfficialAppId,
+            ["clientver"] = KuGouConfig.OfficialClientVer,
+            ["dfid"] = dfid,
+            ["mid"] = mid,
+            ["uuid"] = KgUtils.Md5(dfid + mid),
+            ["clienttime"] = clientTime,
+            ["fpid"] = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString(),
+            ["area_code"] = "1",
+            ["include_unpublish"] = "1",
+            ["useid"] = string.IsNullOrWhiteSpace(session.UserId) ? "0" : session.UserId,
+            ["multi_result"] = "1"
+        };
+
+        return transport.SendAsync(new KgRequest
+        {
+            Method = HttpMethod.Post,
+            Path = "/fingerprint.service/v1/music_trackid_mulit",
+            Params = parameters,
+            ClearDefaultParams = true,
+            BinaryBody = pcmData,
+            ContentType = "application/octet-stream",
+            CustomHeaders = new Dictionary<string, string>
+            {
+                ["user-agent"] = "KuGou/11490 (Android)"
+            },
+            SignatureType = SignatureType.OfficialAndroid
+        });
+    }
+
     public Task<JsonElement> GetAudioKtvTotalAsync(long songId, string songHash, string singerName)
     {
         var parameters = new Dictionary<string, string>

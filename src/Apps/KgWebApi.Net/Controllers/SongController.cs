@@ -70,6 +70,55 @@ public class SongController(SongClient songClient) : ControllerBase
     }
 
     /// <summary>
+    ///     听歌识曲。POST 原始 PCM 音频数据（16-bit，application/octet-stream）。
+    /// </summary>
+    /// <returns>识曲结果。</returns>
+    [HttpPost("/audio/match")]
+    [Consumes("application/octet-stream")]
+    [ProducesResponseType(typeof(AudioMatchResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> MatchAudio()
+    {
+        using var memoryStream = new MemoryStream();
+        await Request.Body.CopyToAsync(memoryStream);
+
+        var pcmData = memoryStream.ToArray();
+        if (pcmData.Length == 0)
+        {
+            return BadRequest(new
+            {
+                status = 0,
+                message = "请求体不能为空，请以 application/octet-stream 提交 PCM 音频数据。"
+            });
+        }
+
+        return Ok(await songClient.GetAudioMatchAsync(pcmData));
+    }
+
+    /// <summary>
+    ///     听歌识曲。使用 multipart/form-data 上传原始 PCM 音频文件。
+    /// </summary>
+    /// <param name="request">表单上传请求，字段名为 file。</param>
+    /// <returns>识曲结果。</returns>
+    [HttpPost("/audio/match")]
+    [Consumes("multipart/form-data")]
+    [ProducesResponseType(typeof(AudioMatchResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> MatchAudioForm([FromForm] AudioMatchUploadRequest request)
+    {
+        if (request.File is null || request.File.Length == 0)
+        {
+            return BadRequest(new
+            {
+                status = 0,
+                message = "表单文件不能为空，请使用 multipart/form-data 并提供 file 字段。"
+            });
+        }
+
+        await using var memoryStream = new MemoryStream();
+        await request.File.CopyToAsync(memoryStream);
+        return Ok(await songClient.GetAudioMatchAsync(memoryStream.ToArray()));
+    }
+
+    /// <summary>
     ///     获取音乐 K 歌数量。
     /// </summary>
     /// <param name="songId">音乐 songid。</param>
@@ -243,4 +292,11 @@ public class SongController(SongClient songClient) : ControllerBase
         var result = await songClient.GetPlayInfoAsync(hash, quality, albumId, albumAudioId, freePart);
         return this.FromKgStatus(result);
     }
+}
+
+public sealed class AudioMatchUploadRequest
+{
+    [FromForm(Name = "file")]
+    [Required]
+    public IFormFile? File { get; init; }
 }

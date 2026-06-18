@@ -74,6 +74,10 @@ public class KgSignatureHandler(KgSessionManager sessionManager) : DelegatingHan
             signature = KgSigner.CalcWebQrSignature(mergedParams);
         else if (kgReq.SignatureType == SignatureType.Register)
             signature = KgSigner.CalcPostSignature(mergedParams, jsonBody);
+        else if (kgReq.BinaryBody is { Length: > 0 } && kgReq.SignatureType == SignatureType.OfficialAndroid)
+            signature = KgSigner.CalcPostSignature(mergedParams, kgReq.BinaryBody, KuGouConfig.OfficialSalt);
+        else if (kgReq.BinaryBody is { Length: > 0 })
+            signature = KgSigner.CalcPostSignature(mergedParams, kgReq.BinaryBody);
         else if (kgReq.SignatureType == SignatureType.OfficialAndroid)
             signature = KgSigner.CalcPostSignature(mergedParams, jsonBody, KuGouConfig.OfficialSalt);
         else
@@ -90,7 +94,8 @@ public class KgSignatureHandler(KgSessionManager sessionManager) : DelegatingHan
         if (!string.IsNullOrEmpty(kgReq.SpecificRouter))
             request.Headers.TryAddWithoutValidation("x-router", kgReq.SpecificRouter);
 
-        request.Headers.TryAddWithoutValidation("User-Agent", KuGouConfig.UserAgent);
+        if (!request.Headers.Contains("User-Agent"))
+            request.Headers.TryAddWithoutValidation("User-Agent", KuGouConfig.UserAgent);
         request.Headers.TryAddWithoutValidation("dfid", currentDfid);
         request.Headers.TryAddWithoutValidation("mid", currentMid);
         if (mergedParams.TryGetValue("clienttime", out var clientTime))
