@@ -304,6 +304,12 @@ public partial class NowPlayingViewModel : ViewModelBase, IDisposable
     }
 
     [RelayCommand]
+    private void RequestWindowToggleFullScreen()
+    {
+        WeakReferenceMessenger.Default.Send(new MainWindowChromeActionMessage(MainWindowChromeAction.ToggleFullScreen));
+    }
+
+    [RelayCommand]
     private void RequestWindowToggleMaximize()
     {
         WeakReferenceMessenger.Default.Send(new MainWindowChromeActionMessage(MainWindowChromeAction.ToggleMaximize));

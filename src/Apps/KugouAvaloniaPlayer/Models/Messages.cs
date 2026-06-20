@@ -57,6 +57,7 @@ public enum LyricSettingsScope
 public enum MainWindowChromeAction
 {
     Minimize,
+    ToggleFullScreen,
     ToggleMaximize,
     Close
 }

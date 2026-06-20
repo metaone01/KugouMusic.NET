@@ -49,6 +49,9 @@ public partial class MainWindow : SukiWindow
             case MainWindowChromeAction.Minimize:
                 WindowState = WindowState.Minimized;
                 break;
+            case MainWindowChromeAction.ToggleFullScreen:
+                ToggleFullScreen();
+                break;
             case MainWindowChromeAction.ToggleMaximize:
                 if (WindowState == WindowState.FullScreen)
                     break;

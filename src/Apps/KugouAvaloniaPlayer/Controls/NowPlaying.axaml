@@ -268,8 +268,15 @@
                             HorizontalAlignment="Right">
                     <Button Classes="Basic"
                             Cursor="Hand"
-                            Command="{Binding RequestWindowMinimizeCommand}"
-                            ToolTip.Tip="最小化">
+                            Command="{Binding RequestWindowToggleFullScreenCommand}">
+                        <PathIcon Data="{x:Static suki:Icons.WindowFullScreen}"
+                                  Foreground="White"
+                                  Width="13"
+                                  Height="13" />
+                    </Button>
+                    <Button Classes="Basic"
+                            Cursor="Hand"
+                            Command="{Binding RequestWindowMinimizeCommand}">
                         <PathIcon Data="{x:Static suki:Icons.WindowMinimize}"
                                   Foreground="White"
                                   Width="13"
@@ -278,8 +285,7 @@
                     </Button>
                     <Button Classes="Basic"
                             Cursor="Hand"
-                            Command="{Binding RequestWindowToggleMaximizeCommand}"
-                            ToolTip.Tip="最大化/还原">
+                            Command="{Binding RequestWindowToggleMaximizeCommand}">
                         <PathIcon Data="{x:Static suki:Icons.WindowMaximize}"
                                   Foreground="White"
                                   Width="13"
@@ -287,8 +293,7 @@
                     </Button>
                     <Button Classes="Basic"
                             Cursor="Hand"
-                            Command="{Binding RequestWindowCloseCommand}"
-                            ToolTip.Tip="关闭">
+                            Command="{Binding RequestWindowCloseCommand}">
                         <PathIcon Data="{x:Static suki:Icons.WindowClose}"
                                   Foreground="White"
                                   Width="13"
