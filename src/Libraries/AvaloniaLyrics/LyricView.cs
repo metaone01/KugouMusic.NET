@@ -5,6 +5,8 @@ using System.Diagnostics;
 using ZLinq;
 using System.Windows.Input;
 using Avalonia;
+using Avalonia.Animation;
+using Avalonia.Animation.Easings;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Templates;
@@ -45,6 +47,7 @@ public class LyricView : ItemsControl
     private const double SeekIndicatorLineWidth = 46d;
     private const double SeekIndicatorRightMargin = 14d;
     private const double SeekIndicatorGap = 6d;
+    private static readonly Easing SmoothScrollEasing = new CubicEaseOut();
 
     public static readonly StyledProperty<IEnumerable<LyricLine>?> LinesProperty =
         AvaloniaProperty.Register<LyricView, IEnumerable<LyricLine>?>(nameof(Lines));
@@ -81,6 +84,9 @@ public class LyricView : ItemsControl
 
     public static readonly StyledProperty<bool> EnableScaleProperty =
         AvaloniaProperty.Register<LyricView, bool>(nameof(EnableScale));
+
+    public static readonly StyledProperty<bool> UseLightweightScrollAnimationProperty =
+        AvaloniaProperty.Register<LyricView, bool>(nameof(UseLightweightScrollAnimation));
 
     public static readonly StyledProperty<double> InactiveScaleProperty =
         AvaloniaProperty.Register<LyricView, double>(nameof(InactiveScale), 0.97d);
@@ -267,6 +273,12 @@ public class LyricView : ItemsControl
     {
         get => GetValue(EnableStaggerProperty);
         set => SetValue(EnableStaggerProperty, value);
+    }
+
+    public bool UseLightweightScrollAnimation
+    {
+        get => GetValue(UseLightweightScrollAnimationProperty);
+        set => SetValue(UseLightweightScrollAnimationProperty, value);
     }
 
     public double InactiveScale
@@ -532,8 +544,15 @@ public class LyricView : ItemsControl
             change.Property == EdgeFadeRatioProperty ||
             change.Property == EnableAnimationProperty ||
             change.Property == EnableStaggerProperty ||
-            change.Property == EnableScaleProperty)
+            change.Property == EnableScaleProperty ||
+            change.Property == UseLightweightScrollAnimationProperty)
         {
+            if (change.Property == UseLightweightScrollAnimationProperty)
+            {
+                StopAnimationFrames();
+                _springStates.Clear();
+            }
+
             if (IsActive)
                 QueueLayoutUpdate();
             return;
@@ -1065,6 +1084,13 @@ public class LyricView : ItemsControl
     private void UpdateSpringState(Control container, double targetTop, double targetOpacity, double targetScale,
         int index, int activeIndex)
     {
+        if (UseLightweightScrollAnimation && !_isUserScrolling)
+        {
+            _springStates.Remove(container);
+            ApplyLightweightVisualState(container, targetTop, targetOpacity, !_isFirstLayoutPass);
+            return;
+        }
+
         var isEntrance = EnableAnimation && _isFirstLayoutPass && !_isUserScrolling;
         var topDelay = isEntrance
             ? GetEntranceDelay(index, activeIndex)
@@ -1158,6 +1184,44 @@ public class LyricView : ItemsControl
 
         var delayMs = (StaggerRange + delta) * StaggerStepMs;
         return TimeSpan.FromMilliseconds(Math.Max(0, delayMs));
+    }
+
+    private void ApplyLightweightVisualState(Control container, double targetTop, double targetOpacity, bool animate)
+    {
+        if (container.RenderTransform is not TranslateTransform transform)
+        {
+            transform = new TranslateTransform();
+            container.RenderTransform = transform;
+            container.RenderTransformOrigin = RelativePoint.Center;
+        }
+
+        if (animate)
+        {
+            if (transform.Transitions is { Count: > 0 } transitions &&
+                transitions[0] is DoubleTransition transition)
+            {
+                transition.Duration = ScrollDuration;
+            }
+            else
+            {
+                transform.Transitions =
+                [
+                    new DoubleTransition
+                    {
+                        Property = TranslateTransform.YProperty,
+                        Duration = ScrollDuration,
+                        Easing = SmoothScrollEasing
+                    }
+                ];
+            }
+        }
+        else
+        {
+            transform.Transitions = null;
+        }
+
+        transform.Y = targetTop;
+        container.Opacity = targetOpacity;
     }
 
     private bool RefreshMeasuredHeights()

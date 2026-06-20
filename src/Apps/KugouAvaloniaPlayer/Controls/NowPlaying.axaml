@@ -557,6 +557,7 @@
                                   SeekCommand="{Binding Player.SeekToLyricLineCommand}"
                                   IsActive="{Binding IsOpen}"
                                   Preset="AppleMusicClassic"
+                                  UseLightweightScrollAnimation="{Binding UseLightweightLyricScroll}"
                                   Margin="{Binding LyricsMargin}"
                                   ShowTranslation="{Binding IsTranslationVisible}"
                                   ShowRomanization="{Binding IsRomanizationVisible}"

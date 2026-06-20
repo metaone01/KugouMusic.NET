@@ -85,6 +85,9 @@ public partial class UserViewModel : PageViewModelBase
     [ObservableProperty]
     public partial bool EnableNowPlayingVisualizer { get; set; }
 
+    [ObservableProperty]
+    public partial bool UseLightweightNowPlayingLyricScroll { get; set; }
+
     [ObservableProperty] 
     public partial bool EnableSeamlessTransition { get; set; } = true;
 
@@ -188,6 +191,7 @@ public partial class UserViewModel : PageViewModelBase
         EnableVolumeNormalization = SettingsManager.Settings.EnableVolumeNormalization;
         EnableSeamlessTransition = SettingsManager.Settings.EnableSeamlessTransition;
         EnableNowPlayingVisualizer = SettingsManager.Settings.EnableNowPlayingVisualizer;
+        UseLightweightNowPlayingLyricScroll = SettingsManager.Settings.UseLightweightNowPlayingLyricScroll;
         DesktopLyricDoubleLineEnabled = SettingsManager.Settings.DesktopLyricDoubleLineEnabled;
         LyricFontFamilyOptions = LoadSystemFontFamilies();
         _availableLyricFonts = new HashSet<string>(LyricFontFamilyOptions, StringComparer.OrdinalIgnoreCase);
@@ -533,6 +537,15 @@ public partial class UserViewModel : PageViewModelBase
         Player.SetNowPlayingVisualizerEnabled(value);
     }
 
+    partial void OnUseLightweightNowPlayingLyricScrollChanged(bool value)
+    {
+        if (_isApplyingSettingsSnapshot) return;
+
+        SettingsManager.Settings.UseLightweightNowPlayingLyricScroll = value;
+        SettingsManager.Save();
+        WeakReferenceMessenger.Default.Send(new LightweightNowPlayingLyricScrollChangedMessage(value));
+    }
+
     partial void OnDesktopLyricDoubleLineEnabledChanged(bool value)
     {
         if (_isApplyingSettingsSnapshot) return;
@@ -783,6 +796,7 @@ public partial class UserViewModel : PageViewModelBase
             EnableVolumeNormalization = SettingsManager.Settings.EnableVolumeNormalization;
             EnableSeamlessTransition = SettingsManager.Settings.EnableSeamlessTransition;
             EnableNowPlayingVisualizer = SettingsManager.Settings.EnableNowPlayingVisualizer;
+            UseLightweightNowPlayingLyricScroll = SettingsManager.Settings.UseLightweightNowPlayingLyricScroll;
             DesktopLyricDoubleLineEnabled = SettingsManager.Settings.DesktopLyricDoubleLineEnabled;
 
             LoadDesktopLyricColorEditorFromSettings();
@@ -818,6 +832,8 @@ public partial class UserViewModel : PageViewModelBase
             new NowPlayingBackgroundBlurRadiusChangedMessage(SettingsManager.Settings.NowPlayingBackgroundBlurRadius));
         WeakReferenceMessenger.Default.Send(
             new NowPlayingBackgroundSourceChangedMessage(SettingsManager.Settings.NowPlayingBackgroundSource));
+        WeakReferenceMessenger.Default.Send(
+            new LightweightNowPlayingLyricScrollChangedMessage(SettingsManager.Settings.UseLightweightNowPlayingLyricScroll));
         OnPropertyChanged(nameof(IsDarkMode));
     }
 

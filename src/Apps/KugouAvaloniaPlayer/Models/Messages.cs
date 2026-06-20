@@ -48,6 +48,8 @@ public record NowPlayingBackgroundBlurRadiusChangedMessage(double Radius);
 
 public record NowPlayingBackgroundSourceChangedMessage(NowPlayingBackgroundSource Source);
 
+public record LightweightNowPlayingLyricScrollChangedMessage(bool IsEnabled);
+
 public enum LyricSettingsScope
 {
     Desktop,

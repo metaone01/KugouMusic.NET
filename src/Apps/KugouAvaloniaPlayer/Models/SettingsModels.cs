@@ -169,6 +169,8 @@ public class AppSettings
 
     public bool EnableNowPlayingVisualizer { get; set; }
 
+    public bool UseLightweightNowPlayingLyricScroll { get; set; }
+
     public float MusicVolume { get; set; } = 0.8f;
 
     public float[] CustomEqGains { get; set; } = new float[10];

@@ -640,6 +640,17 @@
 
                                     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" Margin="0,6">
                                         <StackPanel>
+                                            <TextBlock Text="关闭上升动效" FontWeight="DemiBold" />
+                                            
+                                        </StackPanel>
+                                        <ToggleSwitch Grid.Column="1"
+                                                      IsChecked="{Binding UseLightweightNowPlayingLyricScroll, Mode=TwoWay}" />
+                                    </Grid>
+
+                                    <Border Height="1" Background="{DynamicResource SukiBorder}" Margin="0,6" />
+
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" Margin="0,6">
+                                        <StackPanel>
                                             <TextBlock Text="播放页背景模糊度" FontWeight="DemiBold" />
                                             <TextBlock Text="调整播放页面背景图片的模糊强度"
                                                        FontSize="12"

@@ -45,6 +45,7 @@ public partial class NowPlayingViewModel : ViewModelBase, IDisposable
         NowPlayingLyricDisplayMode = SettingsManager.Settings.PlayPageLyricDisplayMode;
         BackgroundBlurRadius = Math.Clamp(SettingsManager.Settings.NowPlayingBackgroundBlurRadius, 0.0, 80.0);
         BackgroundSource = SettingsManager.Settings.NowPlayingBackgroundSource;
+        UseLightweightLyricScroll = SettingsManager.Settings.UseLightweightNowPlayingLyricScroll;
         CustomBackgroundImagePath = SettingsManager.Settings.CustomBackgroundImagePath;
         ApplyLyricStyleSettings(
             SettingsManager.Settings.PlayPageLyricUseCustomMainColor,
@@ -82,6 +83,11 @@ public partial class NowPlayingViewModel : ViewModelBase, IDisposable
             BackgroundSource = message.Source;
         });
 
+        WeakReferenceMessenger.Default.Register<LightweightNowPlayingLyricScrollChangedMessage>(this, (_, message) =>
+        {
+            UseLightweightLyricScroll = message.IsEnabled;
+        });
+
         WeakReferenceMessenger.Default.Register<AppBackgroundSettingsChangedMessage>(this, (_, message) =>
         {
             CustomBackgroundImagePath = message.CustomImagePath;
@@ -110,6 +116,9 @@ public partial class NowPlayingViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(NowPlayingBackgroundImageSource))]
     public partial string? CustomBackgroundImagePath { get; set; }
+
+    [ObservableProperty]
+    public partial bool UseLightweightLyricScroll { get; set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(PortraitModeStatusText))]
