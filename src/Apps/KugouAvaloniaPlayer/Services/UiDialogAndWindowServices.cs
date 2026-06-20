@@ -1,8 +1,10 @@
 using System;
 using System.ComponentModel;
+using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using KugouAvaloniaPlayer.Models;
 using KugouAvaloniaPlayer.Services.DesktopLyric;
 using KugouAvaloniaPlayer.ViewModels;
 using KugouAvaloniaPlayer.Views;
@@ -92,6 +94,7 @@ public sealed class DesktopLyricWindowService(
         {
             DataContext = lyricViewModel
         };
+        RestoreLyricWindowPosition(lyricWindow);
 
         PropertyChangedEventHandler onLyricViewModelPropertyChanged = (_, e) =>
         {
@@ -113,11 +116,14 @@ public sealed class DesktopLyricWindowService(
         lyricWindow.PositionChanged += (_, _) =>
         {
             if (_isSynchronizingWindowPositions) return;
+            CaptureLyricWindowPosition(lyricWindow);
             SyncOverlayPositionFromLyricWindow();
         };
 
         lyricWindow.Closed += (_, _) =>
         {
+            CaptureLyricWindowPosition(lyricWindow);
+            SettingsManager.Save();
             desktopLyricMousePassthroughService.Apply(lyricWindow, DesktopLyricHitTestLayout.FullWindow);
             CloseLockOverlayWindow();
             lyricViewModel.PropertyChanged -= onLyricViewModelPropertyChanged;
@@ -229,6 +235,7 @@ public sealed class DesktopLyricWindowService(
         try
         {
             _lyricWindow.Position = GetLyricWindowPosition(_lyricWindow, _lockOverlayWindow);
+            CaptureLyricWindowPosition(_lyricWindow);
         }
         finally
         {
@@ -257,6 +264,31 @@ public sealed class DesktopLyricWindowService(
         return new PixelPoint(
             overlayWindow.Position.X - region.X + (CollapsedIconSize - region.Width) / 2,
             overlayWindow.Position.Y - region.Y + (CollapsedIconSize - region.Height) / 2);
+    }
+
+    private static void CaptureLyricWindowPosition(Window lyricWindow)
+    {
+        var position = SettingsManager.Settings.DesktopLyricWindowPosition;
+        position.HasValue = true;
+        position.X = lyricWindow.Position.X;
+        position.Y = lyricWindow.Position.Y;
+    }
+
+    private static void RestoreLyricWindowPosition(Window lyricWindow)
+    {
+        var position = SettingsManager.Settings.DesktopLyricWindowPosition;
+        if (!position.HasValue)
+            return;
+
+        var savedPosition = new PixelPoint(position.X, position.Y);
+        if (IsVisibleOnAnyScreen(lyricWindow, savedPosition))
+            lyricWindow.Position = savedPosition;
+    }
+
+    private static bool IsVisibleOnAnyScreen(Window window, PixelPoint position)
+    {
+        return window.Screens.All.Any(screen =>
+            screen.Bounds.Contains(position) || screen.WorkingArea.Contains(position));
     }
 }
 

@@ -47,6 +47,29 @@ public enum NowPlayingBackgroundSource
     CustomImage
 }
 
+public enum SavedMainWindowState
+{
+    Normal,
+    Maximized
+}
+
+public class MainWindowStateSettings
+{
+    public bool HasValue { get; set; }
+    public double Width { get; set; }
+    public double Height { get; set; }
+    public int X { get; set; }
+    public int Y { get; set; }
+    public SavedMainWindowState State { get; set; } = SavedMainWindowState.Normal;
+}
+
+public class DesktopLyricWindowPositionSettings
+{
+    public bool HasValue { get; set; }
+    public int X { get; set; }
+    public int Y { get; set; }
+}
+
 public class GlobalShortcutSettings
 {
     public bool EnableGlobalShortcuts { get; set; } = true;
@@ -161,6 +184,7 @@ public class AppSettings
     public bool DesktopLyricShowTranslation { get; set; } = true;
     public bool DesktopLyricDoubleLineEnabled { get; set; }
     public bool OpenDesktopLyricOnStartup { get; set; }
+    public DesktopLyricWindowPositionSettings DesktopLyricWindowPosition { get; set; } = new();
 
     public bool PlayPageLyricUseCustomMainColor { get; set; }
     public string PlayPageLyricCustomMainColor { get; set; } = "#FFFFFFFF";
@@ -177,6 +201,8 @@ public class AppSettings
     public double NowPlayingBackgroundBlurRadius { get; set; } = 40;
     public NowPlayingBackgroundSource NowPlayingBackgroundSource { get; set; } =
         NowPlayingBackgroundSource.Cover;
+
+    public MainWindowStateSettings MainWindowState { get; set; } = new();
 
     public GlobalShortcutSettings GlobalShortcuts { get; set; } = new();
 }

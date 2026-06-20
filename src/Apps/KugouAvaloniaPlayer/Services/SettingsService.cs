@@ -14,6 +14,9 @@ namespace KugouAvaloniaPlayer.Services;
 [JsonSerializable(typeof(LyricAlignmentOption))]
 [JsonSerializable(typeof(NowPlayingLyricDisplayMode))]
 [JsonSerializable(typeof(NowPlayingBackgroundSource))]
+[JsonSerializable(typeof(SavedMainWindowState))]
+[JsonSerializable(typeof(MainWindowStateSettings))]
+[JsonSerializable(typeof(DesktopLyricWindowPositionSettings))]
 [JsonSerializable(typeof(LocalPlaylistMeta))]
 [JsonSerializable(typeof(JellyfinServerSettings))]
 [JsonSerializable(typeof(Dictionary<string, LocalPlaylistMeta>))]
@@ -121,7 +124,11 @@ public static class SettingsManager
         Settings.LocalPlaylistMetas ??= new Dictionary<string, LocalPlaylistMeta>();
         Settings.JellyfinServers ??= new Dictionary<string, JellyfinServerSettings>();
         Settings.GlobalShortcuts ??= new GlobalShortcutSettings();
+        Settings.MainWindowState ??= new MainWindowStateSettings();
+        Settings.DesktopLyricWindowPosition ??= new DesktopLyricWindowPositionSettings();
         Settings.AppTheme = NormalizeAppTheme(Settings.AppTheme);
+        if (!Enum.IsDefined(Settings.MainWindowState.State))
+            Settings.MainWindowState.State = SavedMainWindowState.Normal;
         if (!Enum.IsDefined(Settings.PlaybackMode))
             Settings.PlaybackMode = PlayMode.Normal;
         Settings.CustomBackgroundImagePath = string.IsNullOrWhiteSpace(Settings.CustomBackgroundImagePath)
