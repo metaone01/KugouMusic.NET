@@ -1,4 +1,6 @@
+using System.Text.Json;
 using System.Text.Json.Serialization;
+using KuGou.Net.util;
 
 namespace KuGou.Net.Abstractions.Models;
 
@@ -10,7 +12,9 @@ public record UserCloudResponse : KgBaseModel
     /// <summary>
     ///     当前页云盘歌曲列表。
     /// </summary>
-    [JsonPropertyName("list")] public List<UserCloudSong> Songs { get; set; } = new();
+    [JsonPropertyName("list")]
+    [JsonConverter(typeof(UserCloudSongListJsonConverter))]
+    public List<UserCloudSong> Songs { get; set; } = new();
 
     /// <summary>
     ///     云盘歌曲总数。
@@ -229,4 +233,27 @@ public record UserCloudUrlResponse : KgBaseModel
     /// </summary>
     [JsonIgnore]
     public bool IsSuccess => Status == 1 && !string.IsNullOrWhiteSpace(Url);
+}
+
+/// <summary>
+///     兼容云盘列表字段偶发返回 [] / "" / null 三种形态。
+/// </summary>
+public sealed class UserCloudSongListJsonConverter : JsonConverter<List<UserCloudSong>>
+{
+    public override List<UserCloudSong> Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        return reader.TokenType switch
+        {
+            JsonTokenType.Null => [],
+            JsonTokenType.StartArray => JsonSerializer.Deserialize(ref reader, AppJsonContext.Default.ListUserCloudSong) ?? [],
+            JsonTokenType.String when string.IsNullOrWhiteSpace(reader.GetString()) => [],
+            _ => throw new JsonException(
+                $"Unexpected token {reader.TokenType} when parsing user cloud song list.")
+        };
+    }
+
+    public override void Write(Utf8JsonWriter writer, List<UserCloudSong> value, JsonSerializerOptions options)
+    {
+        JsonSerializer.Serialize(writer, value, AppJsonContext.Default.ListUserCloudSong);
+    }
 }
