@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using ZLinq;
 using System.Windows.Input;
@@ -5,6 +6,8 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Styling;
+using Avalonia.Threading;
+using Avalonia.VisualTree;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 using KugouAvaloniaPlayer.Models;
@@ -464,11 +467,65 @@ public partial class SongCollectionDetailView : UserControl
 
     private void ScrollToPlayingSong()
     {
-        var playingSong = Songs?.AsValueEnumerable().OfType<SongItem>().FirstOrDefault(song => song.IsPlaying);
+        var currentSong = ResolveCurrentPlayingSong();
+        var playingSong = Songs?
+            .AsValueEnumerable()
+            .OfType<SongItem>()
+            .FirstOrDefault(song => IsSameSong(song, currentSong));
+
+        if (playingSong is null)
+        {
+            playingSong = Songs?.AsValueEnumerable().OfType<SongItem>().FirstOrDefault(song => song.IsPlaying);
+        }
+
         if (playingSong is null)
             return;
 
         SongList.ScrollIntoView(playingSong);
+        Dispatcher.UIThread.Post(() => AdjustScrollPosition(playingSong), DispatcherPriority.Background);
+    }
+
+    private SongItem? ResolveCurrentPlayingSong()
+    {
+        var topLevel = TopLevel.GetTopLevel(this);
+        return (topLevel?.DataContext as MainWindowViewModel)?.Player.CurrentPlayingSong;
+    }
+
+    private static bool IsSameSong(SongItem candidate, SongItem? currentSong)
+    {
+        if (currentSong is null)
+            return false;
+
+        if (ReferenceEquals(candidate, currentSong))
+            return true;
+
+        return !string.IsNullOrWhiteSpace(candidate.Hash) &&
+               string.Equals(candidate.Hash, currentSong.Hash, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void AdjustScrollPosition(SongItem playingSong)
+    {
+        var scrollViewer = SongList.GetVisualDescendants().AsValueEnumerable().OfType<ScrollViewer>().FirstOrDefault();
+        if (scrollViewer is null)
+            return;
+
+        var target = SongList.GetVisualDescendants()
+            .AsValueEnumerable()
+            .OfType<Control>()
+            .FirstOrDefault(control => ReferenceEquals(control.DataContext, playingSong));
+        if (target is null)
+            return;
+
+        var targetTopLeft = target.TranslatePoint(new Point(0, 0), scrollViewer);
+        if (targetTopLeft is null)
+            return;
+
+        var currentOffset = scrollViewer.Offset;
+        var desiredY = currentOffset.Y + targetTopLeft.Value.Y - (scrollViewer.Viewport.Height * 0.2);
+        var maxOffsetY = Math.Max(0, scrollViewer.Extent.Height - scrollViewer.Viewport.Height);
+        var clampedY = Math.Clamp(desiredY, 0, maxOffsetY);
+
+        scrollViewer.Offset = new Vector(currentOffset.X, clampedY);
     }
 
     private void UpdateHeroActionState()
