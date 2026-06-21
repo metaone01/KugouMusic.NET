@@ -41,6 +41,7 @@ public partial class FavoritePlaylistService(
     private readonly SemaphoreSlim _likeCacheLoadLock = new(1, 1);
     private readonly HashSet<string> _likedHashes = new();
     private bool _hasLoggedFirstLikeCacheSuccess;
+    private string _likeListIdForAction = LikeListIdForAction;
 
     private LikeCacheFileModel? _latestCache;
     private int _likeCacheLoadAttemptCount;
@@ -91,10 +92,20 @@ public partial class FavoritePlaylistService(
             }
 
             var likePlaylist = ResolveLikePlaylist(playlists.Playlists);
-            if (likePlaylist == null || string.IsNullOrWhiteSpace(likePlaylist.ListCreateId))
+            if (likePlaylist == null)
             {
                 logger.LogWarning(
                     "我喜欢远端刷新失败: source=remote cache_hit={CacheHit} fallback_reason=like_playlist_not_found",
+                    _latestCache != null);
+                return;
+            }
+
+            _likeListIdForAction = likePlaylist.ListId.ToString();
+
+            if (string.IsNullOrWhiteSpace(likePlaylist.ListCreateId))
+            {
+                logger.LogWarning(
+                    "我喜欢远端刷新失败: source=remote cache_hit={CacheHit} fallback_reason=like_playlist_missing_create_id",
                     _latestCache != null);
                 return;
             }
@@ -184,7 +195,7 @@ public partial class FavoritePlaylistService(
             {
                 if (_hashToFileId.TryGetValue(hash, out var fileId))
                 {
-                    var result = await playlistClient.RemoveSongsAsync(LikeListIdForAction, new List<long> { fileId });
+                    var result = await playlistClient.RemoveSongsAsync(_likeListIdForAction, new List<long> { fileId });
                     if (result?.Status == 1)
                     {
                         lock (_likedHashes)
@@ -208,7 +219,7 @@ public partial class FavoritePlaylistService(
                 {
                     (song.Name, song.Hash, song.AlbumId, "0")
                 };
-                var result = await playlistClient.AddSongsAsync(LikeListIdForAction, songList);
+                var result = await playlistClient.AddSongsAsync(_likeListIdForAction, songList);
                 if (result?.Status == 1)
                 {
                     lock (_likedHashes)
@@ -388,7 +399,7 @@ public partial class FavoritePlaylistService(
 
             if (result?.Status == 1)
             {
-                if (playlistId == LikeListIdForAction)
+                if (playlistId == _likeListIdForAction)
                 {
                     lock (_likedHashes)
                     {
@@ -481,6 +492,9 @@ public partial class FavoritePlaylistService(
                     _hashToFileId[normalized] = item.FileId;
             }
         }
+
+        if (cache.PlaylistListId > 0)
+            _likeListIdForAction = cache.PlaylistListId.ToString();
 
         cache.Source = source;
         _latestCache = cache;
@@ -658,10 +672,12 @@ public partial class FavoritePlaylistService(
 
     private static UserPlaylistItem? ResolveLikePlaylist(List<UserPlaylistItem> playlists)
     {
-        return playlists.AsValueEnumerable().FirstOrDefault(x => x.ListId == 2)
+        return playlists.AsValueEnumerable().FirstOrDefault(x => string.Equals(x.Name, "我喜欢", StringComparison.OrdinalIgnoreCase))
+               ?? playlists.AsValueEnumerable().FirstOrDefault(x => x.Name.Contains("我喜欢", StringComparison.OrdinalIgnoreCase))
                ?? playlists.AsValueEnumerable().FirstOrDefault(x => x.IsDefault == 2)
+               ?? playlists.AsValueEnumerable().FirstOrDefault(x => x.ListId == 2)
                ?? playlists.AsValueEnumerable().FirstOrDefault(x => x.Name.Contains("喜欢", StringComparison.OrdinalIgnoreCase))
-               ?? playlists.AsValueEnumerable().FirstOrDefault(x => x.Name.Contains("我喜欢", StringComparison.OrdinalIgnoreCase));
+               ;
     }
 }
 
