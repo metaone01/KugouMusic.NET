@@ -19,7 +19,7 @@ public class ViewLocator : IDataTemplate
             [typeof(SearchViewModel)] = static () => new SearchView(),
             [typeof(UserCloudViewModel)] = static () => new UserCloudView(),
             [typeof(SingerViewModel)] = static () => new SingerView(),
-            [typeof(UserViewModel)] = static () => new UserView(),
+            [typeof(SettingViewModel)] = static () => new SettingView(),
             [typeof(RankViewModel)] = static () => new RankView(),
             [typeof(DailyRecommendViewModel)] = static () => new DailyRecommendView(),
             [typeof(HistoryViewModel)] = static () => new HistoryView(),

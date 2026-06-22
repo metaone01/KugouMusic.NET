@@ -2,9 +2,9 @@ using Avalonia.Controls;
 
 namespace KugouAvaloniaPlayer.Views;
 
-public partial class UserView : UserControl
+public partial class SettingView : UserControl
 {
-    public UserView()
+    public SettingView()
     {
         InitializeComponent();
     }

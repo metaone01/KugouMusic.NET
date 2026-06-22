@@ -90,7 +90,7 @@ public sealed partial class AvaloniaAppServiceProvider
         .Bind<LoginViewModel>().To<LoginViewModel>()
         .Bind<SearchViewModel>().To<SearchViewModel>()
         .Bind<UserCloudViewModel>().To<UserCloudViewModel>()
-        .Bind<UserViewModel>().To<UserViewModel>()
+        .Bind<SettingViewModel>().To<SettingViewModel>()
         .Bind<NowPlayingViewModel>().To<NowPlayingViewModel>()
         .Bind<MainWindowViewModel>().To<MainWindowViewModel>()
         .Bind<DailyRecommendViewModel>().To<DailyRecommendViewModel>()

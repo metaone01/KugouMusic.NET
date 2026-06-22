@@ -39,7 +39,7 @@ public partial class MainWindowViewModel : ObservableObject
     private readonly UserCloudViewModel _userCloudViewModel;
     private readonly KgSessionManager _sessionManager;
     private readonly UserClient _userClient;
-    private readonly UserViewModel _userViewModel;
+    private readonly SettingViewModel _settingViewModel;
 
     [ObservableProperty]
     public partial PageViewModelBase ActivePage { get; set; }
@@ -95,7 +95,7 @@ public partial class MainWindowViewModel : ObservableObject
         LoginViewModel loginViewModel,
         SearchViewModel searchViewModel,
         UserCloudViewModel userCloudViewModel,
-        UserViewModel userViewModel,
+        SettingViewModel settingViewModel,
         RankViewModel rankViewModel,
         DailyRecommendViewModel dailyRecommendViewModel,
         HistoryViewModel historyViewModel,
@@ -118,11 +118,11 @@ public partial class MainWindowViewModel : ObservableObject
         LoginViewModel = loginViewModel;
         _searchViewModel = searchViewModel;
         _userCloudViewModel = userCloudViewModel;
-        _userViewModel = userViewModel;
+        _settingViewModel = settingViewModel;
         PlaylistsViewModel = myPlaylistsViewModel;
         _logger = logger;
 
-        _userViewModel.CheckForUpdateRequested += OnCheckForUpdateRequested;
+        _settingViewModel.CheckForUpdateRequested += OnCheckForUpdateRequested;
         _desktopLyricWindowService.IsOpenChanged += OnDesktopLyricWindowStateChanged;
 
         Player = player;
@@ -461,9 +461,9 @@ public partial class MainWindowViewModel : ObservableObject
             {
                 UserName = userInfo.Name;
                 UserAvatar = string.IsNullOrWhiteSpace(userInfo.Pic) ? null : userInfo.Pic;
-                _userViewModel.UserName = UserName;
-                _userViewModel.UserAvatar = UserAvatar;
-                _userViewModel.UserId = _sessionManager.Session.UserId;
+                _settingViewModel.UserName = UserName;
+                _settingViewModel.UserAvatar = UserAvatar;
+                _settingViewModel.UserId = _sessionManager.Session.UserId;
             }
         }
         catch (Exception ex)
@@ -545,10 +545,10 @@ public partial class MainWindowViewModel : ObservableObject
             IsLoggedIn = false;
             UserName = "未登录";
             UserAvatar = null;
-            _userViewModel.UserName = UserName;
-            _userViewModel.UserAvatar = null;
-            _userViewModel.UserId = string.Empty;
-            _userViewModel.VipStatus = "未开通";
+            _settingViewModel.UserName = UserName;
+            _settingViewModel.UserAvatar = null;
+            _settingViewModel.UserId = string.Empty;
+            _settingViewModel.VipStatus = "未开通";
             Player.ClearPersonalFmSession();
             _userCloudViewModel.LoadCloudCommand.Execute(null);
             _ = _dailyRecommendViewModel.OnAuthStateChangedAsync();
@@ -572,7 +572,7 @@ public partial class MainWindowViewModel : ObservableObject
         }
         finally
         {
-            Dispatcher.UIThread.Post(() => _userViewModel.SetCheckingUpdateState(false));
+            Dispatcher.UIThread.Post(() => _settingViewModel.SetCheckingUpdateState(false));
         }
     }
 
@@ -586,9 +586,9 @@ public partial class MainWindowViewModel : ObservableObject
     private void NavigateToUser()
     {
         if (IsLoggedIn)
-            _ = _userViewModel.LoadUserInfoAsync();
+            _ = _settingViewModel.LoadUserInfoAsync();
 
-        NavigateToPage(_userViewModel);
+        NavigateToPage(_settingViewModel);
     }
 
     [RelayCommand]

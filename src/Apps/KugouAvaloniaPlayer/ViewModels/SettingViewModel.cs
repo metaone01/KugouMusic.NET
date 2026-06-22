@@ -14,7 +14,6 @@ using CommunityToolkit.Mvvm.Messaging;
 using KuGou.Net.Clients;
 using KuGou.Net.Protocol.Session;
 using KugouAvaloniaPlayer.Behaviors;
-using KugouAvaloniaPlayer.Controls;
 using KugouAvaloniaPlayer.Models;
 using KugouAvaloniaPlayer.Services;
 using KugouAvaloniaPlayer.Services.GlobalShortcutService;
@@ -24,7 +23,7 @@ using EqSettingsView = KugouAvaloniaPlayer.Views.EqSettingsView;
 
 namespace KugouAvaloniaPlayer.ViewModels;
 
-public partial class UserViewModel : PageViewModelBase
+public partial class SettingViewModel : PageViewModelBase
 {
     private const string SettingsSectionGeneral = "常规";
     private const string SettingsSectionPlayback = "播放与音效";
@@ -162,7 +161,7 @@ public partial class UserViewModel : PageViewModelBase
     [ObservableProperty]
     public partial string VipStatus { get; set; } = "未开通";
 
-    public UserViewModel(PlayerViewModel player, UserClient userClient, LoginClient authClient,
+    public SettingViewModel(PlayerViewModel player, UserClient userClient, LoginClient authClient,
         ISukiDialogManager dialogManager, EqSettingsViewModel eqSettingsViewModel, KgSessionManager sessionManager,
         IGlobalShortcutService globalShortcutService, IGitHubReleaseService releaseService,
         IFolderPickerService folderPickerService)

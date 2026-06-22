@@ -90,7 +90,7 @@
         <Compile Update="Controls\LoginControl.axaml.cs">
             <DependentUpon>LoginControl.axaml</DependentUpon>
         </Compile>
-        <Compile Update="Views\UserView.axaml.cs">
+        <Compile Update="Views\SettingView.axaml.cs">
             <DependentUpon>UserView.axaml</DependentUpon>
         </Compile>
         <Compile Update="Views\SingerView.axaml.cs">
