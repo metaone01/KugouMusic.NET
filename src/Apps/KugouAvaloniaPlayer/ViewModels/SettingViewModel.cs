@@ -239,6 +239,8 @@ public partial class SettingViewModel : PageViewModelBase
 
     public string[] EQPresetOptions { get; }
 
+    public bool IsOutputDeviceSelectionVisible => !OperatingSystem.IsLinux();
+
     public string[] SettingsSections { get; } =
     [
         SettingsSectionGeneral, SettingsSectionPlayback, SettingsSectionShortcuts, SettingsSectionLyrics,

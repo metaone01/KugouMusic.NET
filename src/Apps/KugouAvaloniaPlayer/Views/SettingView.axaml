@@ -250,7 +250,10 @@
                                        FontWeight="SemiBold"
                                        FontSize="16" />
 
-                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" Margin="0,6">
+                            <Grid ColumnDefinitions="*,Auto"
+                                  ColumnSpacing="12"
+                                  Margin="0,6"
+                                  IsVisible="{Binding IsOutputDeviceSelectionVisible}">
                                 <StackPanel>
                                     <TextBlock Text="输出设备" FontWeight="DemiBold" />
                                     <TextBlock Text="选择播放声音输出到哪个系统音频设备"
