@@ -6,13 +6,12 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using ATL;
 using Avalonia.Media.Imaging;
 using KugouAvaloniaPlayer.Models;
 using KugouAvaloniaPlayer.Services.Jellyfin;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
-using TagLib;
-using File = TagLib.File;
 
 namespace KugouAvaloniaPlayer.Services;
 
@@ -75,6 +74,7 @@ public sealed class LocalMusicLibraryService(
 
     private static readonly HashSet<string> SupportedLocalAudioExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
+        ".ape",
         ".mp3",
         ".flac",
         ".wav",
@@ -468,7 +468,7 @@ public sealed class LocalMusicLibraryService(
                 SettingsManager.Settings.LocalPlaylistMetas.Remove(folder);
                 migrated = true;
             }
-            catch (Exception ex) when (ex is UnauthorizedAccessException or IOException or CorruptFileException or UnsupportedFormatException)
+            catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
             {
                 logger.LogWarning(ex, "迁移旧本地歌单失败，保留旧 JSON 条目。 folder={Folder}", folder);
             }
@@ -1211,24 +1211,12 @@ public sealed class LocalMusicLibraryService(
 
         try
         {
-            using var tfile = File.Create(filePath);
-            title = string.IsNullOrWhiteSpace(tfile.Tag.Title) ? title : tfile.Tag.Title;
-
-            var artists = tfile.Tag.Performers;
-            if (artists is { Length: > 0 })
-                artist = string.Join(", ", artists.AsValueEnumerable().Where(x => !string.IsNullOrWhiteSpace(x)).ToArray());
-
-            album = tfile.Tag.Album ?? "";
-            duration = tfile.Properties?.Duration.TotalSeconds ?? 0;
-            coverPath ??= GetEmbeddedSongCoverSource(filePath, tfile);
-        }
-        catch (UnsupportedFormatException)
-        {
-            logger.LogWarning("文件格式不支持，已降级为文件名加载 [{File}]", filePath);
-        }
-        catch (CorruptFileException ex)
-        {
-            logger.LogWarning(ex, "文件头伪装或损坏，已降级为文件名加载。 file={File}", filePath);
+            var track = new Track(filePath);
+            title = string.IsNullOrWhiteSpace(track.Title) ? title : track.Title;
+            artist = NormalizeAtlArtists(track.Artist, artist);
+            album = track.Album ?? "";
+            duration = track.DurationMs > 0 ? track.DurationMs / 1000d : track.Duration;
+            coverPath ??= GetEmbeddedSongCoverSource(filePath, track);
         }
         catch (Exception ex)
         {
@@ -1258,11 +1246,21 @@ public sealed class LocalMusicLibraryService(
         return !string.IsNullOrWhiteSpace(filePath) && System.IO.File.Exists(filePath);
     }
 
-    private static string? GetEmbeddedSongCoverSource(string songPath, File tagFile)
+    private static string NormalizeAtlArtists(string? artistValue, string fallbackArtist)
     {
-        var picture = tagFile.Tag.Pictures?
-                          .AsValueEnumerable().FirstOrDefault(x => x.Type == PictureType.FrontCover && x.Data.Count > 0)
-            ?? tagFile.Tag.Pictures?.AsValueEnumerable().FirstOrDefault(x => x.Data.Count > 0);
+        if (string.IsNullOrWhiteSpace(artistValue))
+            return fallbackArtist;
+
+        var artists = artistValue
+            .Split(Settings.DisplayValueSeparator, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        return artists.Length > 0 ? string.Join(", ", artists) : fallbackArtist;
+    }
+
+    private static string? GetEmbeddedSongCoverSource(string songPath, Track track)
+    {
+        var picture = track.EmbeddedPictures?
+                          .AsValueEnumerable().FirstOrDefault(x => x.PicType == PictureInfo.PIC_TYPE.Front && x.PictureData.Length > 0)
+            ?? track.EmbeddedPictures?.AsValueEnumerable().FirstOrDefault(x => x.PictureData.Length > 0);
 
         if (picture == null)
             return null;
@@ -1272,7 +1270,7 @@ public sealed class LocalMusicLibraryService(
             Directory.CreateDirectory(LocalSongCoverCacheDirectory);
 
             var cacheKey = GetStableHash(
-                $"{EmbeddedCoverCacheVersion}|{songPath}|{System.IO.File.GetLastWriteTimeUtc(songPath).Ticks}|{picture.Data.Count}");
+                $"{EmbeddedCoverCacheVersion}|{songPath}|{System.IO.File.GetLastWriteTimeUtc(songPath).Ticks}|{picture.PictureData.Length}");
             var cachePath = Path.Combine(LocalSongCoverCacheDirectory, $"{cacheKey}.jpg");
 
             if (!System.IO.File.Exists(cachePath))
@@ -1293,9 +1291,9 @@ public sealed class LocalMusicLibraryService(
         }
     }
 
-    private static void WriteEmbeddedCoverThumbnail(IPicture picture, string cachePath)
+    private static void WriteEmbeddedCoverThumbnail(PictureInfo picture, string cachePath)
     {
-        using var input = new MemoryStream(picture.Data.Data, writable: false);
+        using var input = new MemoryStream(picture.PictureData, writable: false);
         using var bitmap = Bitmap.DecodeToWidth(
             input,
             EmbeddedCoverThumbnailWidth,

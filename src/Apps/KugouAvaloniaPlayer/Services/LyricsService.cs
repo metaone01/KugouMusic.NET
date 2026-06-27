@@ -5,13 +5,13 @@ using ZLinq;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using ATL;
 using AvaloniaLyrics;
 using Avalonia.Collections;
 using KuGou.Net.Adapters.Lyrics;
 using KuGou.Net.Clients;
 using KugouAvaloniaPlayer.ViewModels;
 using Microsoft.Extensions.Logging;
-using TagFile = TagLib.File;
 
 namespace KugouAvaloniaPlayer.Services;
 
@@ -209,13 +209,34 @@ public class LyricsService(LyricClient lyricClient, ILogger<LyricsService> logge
     {
         try
         {
-            using var tagFile = TagFile.Create(audioFilePath);
-            return string.IsNullOrWhiteSpace(tagFile.Tag.Lyrics) ? null : tagFile.Tag.Lyrics;
+            var track = new Track(audioFilePath);
+            return GetEmbeddedLyrics(track.Lyrics);
         }
         catch
         {
             return null;
         }
+    }
+
+    private static string? GetEmbeddedLyrics(IList<LyricsInfo>? lyrics)
+    {
+        if (lyrics == null || lyrics.Count == 0)
+            return null;
+
+        foreach (var entry in lyrics)
+        {
+            if (entry.SynchronizedLyrics is { Count: > 0 })
+            {
+                var content = entry.FormatSynch();
+                if (!string.IsNullOrWhiteSpace(content))
+                    return content;
+            }
+
+            if (!string.IsNullOrWhiteSpace(entry.UnsynchronizedLyrics))
+                return entry.UnsynchronizedLyrics;
+        }
+
+        return null;
     }
 
     private static string DetectEmbeddedLyricFormat(string content)

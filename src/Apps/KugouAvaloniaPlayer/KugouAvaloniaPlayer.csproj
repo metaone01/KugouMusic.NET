@@ -31,7 +31,6 @@
 
     <ItemGroup>
         <AvaloniaResource Include="Assets\**"/>
-        <TrimmerRootAssembly Include="TagLibSharp"/>
     </ItemGroup>
 
     <ItemGroup>
@@ -62,10 +61,10 @@
         <PackageReference Include="SukiUI"/>
         <PackageReference Include="Svg.Controls.Avalonia"/>
         <PackageReference Include="System.Security.Cryptography.ProtectedData"/>
-        <PackageReference Include="TagLibSharp"/>
         <PackageReference Include="Tmds.DBus.Protocol"/>
         <PackageReference Include="Velopack" />
         <PackageReference Include="ZLinq" />
+        <PackageReference Include="z440.atl.core" />
     </ItemGroup>
 
     <ItemGroup>

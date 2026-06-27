@@ -163,13 +163,13 @@ public partial class SimpleAudioPlayer
                 TryInitializeOutputDevice(Bass.DefaultDevice, out _);
             }
 
-            Bass.PluginLoad(GetBassPluginName("bassflac"));
-            Bass.PluginLoad(GetBassPluginName("bassdsd"));
-            Bass.PluginLoad(GetBassPluginName("bassloud"));
-            Bass.PluginLoad(GetBassPluginName("basswebm"));
+            TryLoadBassPlugin("bassflac");
+            TryLoadBassPlugin("bassdsd");
+            TryLoadBassPlugin("basswebm");
+            TryLoadBassPlugin("bassape");
             if (!OperatingSystem.IsMacOS())
             {
-                Bass.PluginLoad(GetBassPluginName("bass_aac"));
+                TryLoadBassPlugin("bass_aac");
             }
 
             try
@@ -333,5 +333,15 @@ public partial class SimpleAudioPlayer
         }
 
         return Bass.DefaultDevice;
+    }
+
+    private static void TryLoadBassPlugin(string baseName)
+    {
+        var pluginName = GetBassPluginName(baseName);
+        var handle = Bass.PluginLoad(pluginName);
+        if (handle == 0)
+        {
+            Console.WriteLine($"[BASS PluginLoad Error] plugin={pluginName}, error={Bass.LastError}");
+        }
     }
 }

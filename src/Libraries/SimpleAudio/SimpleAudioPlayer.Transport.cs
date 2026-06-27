@@ -32,6 +32,7 @@ public partial class SimpleAudioPlayer : IDisposable
 
         if (Stream == 0)
         {
+            Console.WriteLine($"[BASS CreateStream Error] path={url}, extension={Path.GetExtension(url)}, error={Bass.LastError}");
             return false;
         }
 
