@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using ATL;
 using Avalonia.Media.Imaging;
+using KugouAvaloniaPlayer.Converters;
 using KugouAvaloniaPlayer.Models;
 using KugouAvaloniaPlayer.Services.Jellyfin;
 using Microsoft.Data.Sqlite;
@@ -439,7 +440,17 @@ public sealed class LocalMusicLibraryService(
         if (track == null)
             return;
 
-        track.CoverPath = coverPath;
+        if (!string.Equals(track.SourceType, SourceTypeLocalFile, StringComparison.Ordinal) ||
+            string.IsNullOrWhiteSpace(track.LocalPath) ||
+            !System.IO.File.Exists(track.LocalPath))
+        {
+            throw new InvalidOperationException("只有本地音频文件支持写入嵌入封面。");
+        }
+
+        await WriteEmbeddedCoverAsync(track.LocalPath, coverPath, cancellationToken);
+
+        track.CoverPath = LocalImageSourceHelper.BuildEmbeddedCoverSource(track.LocalPath);
+        track.LastWriteTimeUtc = System.IO.File.GetLastWriteTimeUtc(track.LocalPath);
         track.UpdatedAtUtc = DateTime.UtcNow;
         await UpdateTrackAsync(connection, null, track, cancellationToken);
     }
@@ -1262,100 +1273,26 @@ public sealed class LocalMusicLibraryService(
                           .AsValueEnumerable().FirstOrDefault(x => x.PicType == PictureInfo.PIC_TYPE.Front && x.PictureData.Length > 0)
             ?? track.EmbeddedPictures?.AsValueEnumerable().FirstOrDefault(x => x.PictureData.Length > 0);
 
-        if (picture == null)
-            return null;
+        return picture == null ? null : LocalImageSourceHelper.BuildEmbeddedCoverSource(songPath);
+    }
 
-        try
+    private static async Task WriteEmbeddedCoverAsync(string audioFilePath, string imagePath, CancellationToken cancellationToken)
+    {
+        var imageBytes = await System.IO.File.ReadAllBytesAsync(imagePath, cancellationToken);
+        await Task.Run(() =>
         {
-            Directory.CreateDirectory(LocalSongCoverCacheDirectory);
-
-            var cacheKey = GetStableHash(
-                $"{EmbeddedCoverCacheVersion}|{songPath}|{System.IO.File.GetLastWriteTimeUtc(songPath).Ticks}|{picture.PictureData.Length}");
-            var cachePath = Path.Combine(LocalSongCoverCacheDirectory, $"{cacheKey}.jpg");
-
-            if (!System.IO.File.Exists(cachePath))
+            var track = new Track(audioFilePath);
+            var pictures = track.EmbeddedPictures;
+            for (var i = pictures.Count - 1; i >= 0; i--)
             {
-                WriteEmbeddedCoverThumbnail(picture, cachePath);
-                TrimLocalSongCoverCache();
-            }
-            else
-            {
-                TouchCacheFile(cachePath);
+                if (pictures[i].PicType == PictureInfo.PIC_TYPE.Front)
+                    pictures.RemoveAt(i);
             }
 
-            return cachePath;
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
-    private static void WriteEmbeddedCoverThumbnail(PictureInfo picture, string cachePath)
-    {
-        using var input = new MemoryStream(picture.PictureData, writable: false);
-        using var bitmap = Bitmap.DecodeToWidth(
-            input,
-            EmbeddedCoverThumbnailWidth,
-            BitmapInterpolationMode.HighQuality);
-
-        bitmap.Save(cachePath, EmbeddedCoverJpegQuality);
-    }
-
-    private static void TrimLocalSongCoverCache()
-    {
-        try
-        {
-            var directory = new DirectoryInfo(LocalSongCoverCacheDirectory);
-            if (!directory.Exists)
-                return;
-
-            var files = directory
-                .EnumerateFiles("*.jpg")
-                .AsValueEnumerable().OrderByDescending(static x => x.LastWriteTimeUtc)
-                .ToList();
-            var totalBytes = files.AsValueEnumerable().Sum(static x => x.Length);
-            if (totalBytes <= MaxLocalSongCoverCacheBytes)
-                return;
-
-            foreach (var file in files.AsValueEnumerable().Reverse())
-            {
-                if (totalBytes <= MaxLocalSongCoverCacheBytes)
-                    break;
-
-                var length = file.Length;
-                TryDeleteCacheFile(file.FullName);
-                totalBytes -= length;
-            }
-        }
-        catch
-        {
-            // Best effort cleanup only.
-        }
-    }
-
-    private static void TouchCacheFile(string cachePath)
-    {
-        try
-        {
-            System.IO.File.SetLastWriteTimeUtc(cachePath, DateTime.UtcNow);
-        }
-        catch
-        {
-            // Best effort recency update only.
-        }
-    }
-
-    private static void TryDeleteCacheFile(string cachePath)
-    {
-        try
-        {
-            System.IO.File.Delete(cachePath);
-        }
-        catch
-        {
-            // Best effort cleanup only.
-        }
+            pictures.Insert(0, PictureInfo.fromBinaryData(imageBytes, PictureInfo.PIC_TYPE.Front));
+            if (!track.Save())
+                throw new IOException($"写入嵌入封面失败: {audioFilePath}");
+        }, cancellationToken);
     }
 
     private static string GetStableHash(string value)

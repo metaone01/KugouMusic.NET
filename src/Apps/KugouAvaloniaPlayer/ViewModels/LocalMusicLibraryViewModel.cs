@@ -8,6 +8,7 @@ using Avalonia.Controls.Notifications;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
+using KugouAvaloniaPlayer.Converters;
 using KugouAvaloniaPlayer.Models;
 using KugouAvaloniaPlayer.Services;
 using KugouAvaloniaPlayer.Services.Jellyfin;
@@ -240,12 +241,13 @@ public partial class LocalMusicLibraryViewModel : PageViewModelBase
             return;
 
         await _localMusicLibraryService.SetTrackCoverAsync(song.LocalTrackId, coverPath);
-        song.Cover = GetImageSourceOrDefault(coverPath, DefaultSongCover);
+        if (!string.IsNullOrWhiteSpace(song.LocalFilePath))
+            song.Cover = LocalImageSourceHelper.BuildEmbeddedCoverSource(song.LocalFilePath);
 
         _toastManager.CreateToast()
             .OfType(NotificationType.Success)
             .WithTitle("已设置封面")
-            .WithContent($"已更新「{song.Name}」的本地封面")
+            .WithContent($"已将封面写入「{song.Name}」的音频标签")
             .Dismiss().After(TimeSpan.FromSeconds(3))
             .Dismiss().ByClicking()
                 .Queue();
@@ -637,7 +639,7 @@ public partial class LocalMusicLibraryViewModel : PageViewModelBase
             RemoteUrl = item.RemoteUrl,
             Cover = isJellyfinTrack
                 ? string.IsNullOrWhiteSpace(item.CoverPath) ? DefaultSongCover : item.CoverPath
-                : GetImageSourceOrDefault(item.CoverPath, DefaultSongCover)
+                : ResolveLocalSongCoverSource(item.CoverPath, item.LocalPath)
         };
     }
 
@@ -670,6 +672,9 @@ public partial class LocalMusicLibraryViewModel : PageViewModelBase
         if (string.IsNullOrWhiteSpace(imagePath))
             return defaultSource;
 
+        if (LocalImageSourceHelper.TryGetEmbeddedCoverFilePath(imagePath, out _))
+            return imagePath;
+
         if (Uri.TryCreate(imagePath, UriKind.Absolute, out var uri) &&
             (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps || uri.Scheme == "avares"))
         {
@@ -680,6 +685,22 @@ public partial class LocalMusicLibraryViewModel : PageViewModelBase
             return defaultSource;
 
         return new Uri(imagePath).AbsoluteUri;
+    }
+
+    private static string ResolveLocalSongCoverSource(string? coverPath, string? localPath)
+    {
+        if (!string.IsNullOrWhiteSpace(coverPath))
+        {
+            if (LocalImageSourceHelper.TryGetEmbeddedCoverFilePath(coverPath, out _))
+                return coverPath;
+
+            if (System.IO.File.Exists(coverPath))
+                return new Uri(coverPath).AbsoluteUri;
+        }
+
+        return string.IsNullOrWhiteSpace(localPath) || !System.IO.File.Exists(localPath)
+            ? DefaultSongCover
+            : LocalImageSourceHelper.BuildEmbeddedCoverSource(localPath);
     }
 
     private static string? LocalPathFromImageSource(string? source)
