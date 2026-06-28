@@ -23,7 +23,7 @@
   </p>
 </div>
 
-最好用、最轻量的酷狗音乐概念版播放器，登录自动领取 VIP。
+最好用、最轻量的酷狗音乐概念版播放器。
 
 项目基于 **.NET 10 + Avalonia** 打造，尽量提供一致的全平台桌面体验，而不是浏览器套壳式客户端。因为作者长期使用 Arch Linux 和 Windows 双系统，而 Linux 上又缺少一款体验完整的酷狗音乐播放器，这个项目就这样诞生了。
 
@@ -186,6 +186,10 @@ xattr -dr com.apple.quarantine /Applications/KugouAvaloniaPlayer.app
 
 完整版本历史请查看 [Releases](https://github.com/Linsxyx/KugouMusic.NET/releases)。
 
+### v2.10.0
+- 优化大规模本地歌曲导入
+- 优化本地歌曲图片加载
+
 ### v2.9.1
 - 修复自定义均衡器出错导致启动失败
 - 添加轻量级歌词滚动动画选项
@@ -197,13 +201,7 @@ xattr -dr com.apple.quarantine /Applications/KugouAvaloniaPlayer.app
 - 保存播放模式和是否打开桌面歌词
 - 修复控制栏上的按钮偏移
 
-### v2.8.2
-- 修复无法录入带有空格键的快捷键
-- 修复调整自定义图片透明度时的内存泄漏
-- 修复歌曲支持音质小于设置中的音质时获取不到播放链接
-- 修复本地内嵌封面歌曲图片加载导致的内存泄露
-- 桌面歌词窗口支持在窗口切换器中隐藏
-- 将我的歌单拆分为创建的歌单"和收藏的歌单
+
 
 ## 开发者入口
 

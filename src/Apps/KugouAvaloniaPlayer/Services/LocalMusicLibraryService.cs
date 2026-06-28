@@ -5,6 +5,7 @@ using ZLinq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 using ATL;
 using Avalonia.Media.Imaging;
@@ -62,6 +63,7 @@ public sealed class LocalMusicLibraryService(
     private const string PlaylistKindImportedFolder = "ImportedFolder";
     private const string PlaylistKindJellyfinLibrary = "JellyfinLibrary";
     private const string SourceTypeLocalFile = "LocalFile";
+    private const int LocalImportBatchSize = 32;
     private const string EmbeddedCoverCacheVersion = "thumb-v1";
     private const int EmbeddedCoverThumbnailWidth = 512;
     private const int EmbeddedCoverJpegQuality = 86;
@@ -320,10 +322,6 @@ public sealed class LocalMusicLibraryService(
         if (!Directory.Exists(folderPath))
             throw new DirectoryNotFoundException(folderPath);
 
-        var files = Directory.EnumerateFiles(folderPath, "*.*", SearchOption.AllDirectories)
-            .AsValueEnumerable().Where(IsSupportedAudioFile)
-            .ToList();
-
         await using var connection = await AppDatabase.CreateConnectionAsync(cancellationToken);
         await using var transaction = connection.BeginTransaction();
 
@@ -345,10 +343,10 @@ public sealed class LocalMusicLibraryService(
                 CreatedAtUtc = now,
                 UpdatedAtUtc = now
             };
-            playlist.Id = await InsertPlaylistAsync(connection, transaction, playlist, cancellationToken);
+                playlist.Id = await InsertPlaylistAsync(connection, transaction, playlist, cancellationToken);
         }
 
-        await ReplacePlaylistTracksAsync(connection, transaction, playlist.Id, files, null, cancellationToken);
+        await ReplacePlaylistTracksFromFolderAsync(connection, transaction, playlist.Id, folderPath, null, cancellationToken);
         playlist.UpdatedAtUtc = DateTime.UtcNow;
         await UpdatePlaylistAsync(connection, transaction, playlist, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
@@ -495,10 +493,6 @@ public sealed class LocalMusicLibraryService(
 
     private async Task ImportLegacyFolderAsync(string folderPath, LocalPlaylistMeta? meta, CancellationToken cancellationToken)
     {
-        var files = Directory.EnumerateFiles(folderPath, "*.*", SearchOption.AllDirectories)
-            .AsValueEnumerable().Where(IsSupportedAudioFile)
-            .ToList();
-
         await using var connection = await AppDatabase.CreateConnectionAsync(cancellationToken);
         await using var transaction = connection.BeginTransaction();
 
@@ -531,32 +525,60 @@ public sealed class LocalMusicLibraryService(
                 playlist.CoverPath = meta!.CoverPath;
         }
 
-        await ReplacePlaylistTracksAsync(connection, transaction, playlist.Id, files, meta?.SongCoverPaths, cancellationToken);
+        await ReplacePlaylistTracksFromFolderAsync(connection, transaction, playlist.Id, folderPath, meta?.SongCoverPaths, cancellationToken);
         playlist.UpdatedAtUtc = DateTime.UtcNow;
         await UpdatePlaylistAsync(connection, transaction, playlist, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
     }
 
-    private async Task ReplacePlaylistTracksAsync(
+    private async Task ReplacePlaylistTracksFromFolderAsync(
         SqliteConnection connection,
         SqliteTransaction transaction,
         long playlistId,
-        IReadOnlyList<string> filePaths,
+        string folderPath,
         IReadOnlyDictionary<string, string>? legacySongCovers,
         CancellationToken cancellationToken)
     {
         await DeletePlaylistTracksAsync(connection, transaction, playlistId, cancellationToken);
 
-        for (var i = 0; i < filePaths.Count; i++)
+        var channel = Channel.CreateBounded<IReadOnlyList<LocalTrackImportData>>(new BoundedChannelOptions(4)
         {
-            var track = await UpsertTrackAsync(
-                connection,
-                transaction,
-                filePaths[i],
-                GetLegacyCover(filePaths[i], legacySongCovers),
-                cancellationToken);
-            await InsertPlaylistTrackAsync(connection, transaction, playlistId, track.Id, i, DateTime.UtcNow, cancellationToken);
+            FullMode = BoundedChannelFullMode.Wait,
+            SingleReader = true,
+            SingleWriter = true
+        });
+
+        var producer = Task.Run(async () =>
+        {
+            try
+            {
+                foreach (var fileBatch in EnumerateSupportedAudioFileBatches(folderPath, LocalImportBatchSize))
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var importedBatch = await PrepareLocalTrackBatchAsync(fileBatch, legacySongCovers, cancellationToken);
+                    await channel.Writer.WriteAsync(importedBatch, cancellationToken);
+                }
+
+                channel.Writer.TryComplete();
+            }
+            catch (Exception ex)
+            {
+                channel.Writer.TryComplete(ex);
+                throw;
+            }
+        }, cancellationToken);
+
+        var position = 0;
+        await foreach (var importedBatch in channel.Reader.ReadAllAsync(cancellationToken))
+        {
+            foreach (var importedTrack in importedBatch)
+            {
+                var track = await UpsertTrackAsync(connection, transaction, importedTrack, cancellationToken);
+                await InsertPlaylistTrackAsync(connection, transaction, playlistId, track.Id, position++, DateTime.UtcNow, cancellationToken);
+            }
         }
+
+        await producer;
     }
 
     private async Task<LocalTrackEntity> UpsertTrackAsync(
@@ -590,6 +612,39 @@ public sealed class LocalMusicLibraryService(
         track.RemoteUrl = null;
         track.FileSize = fileSize;
         track.LastWriteTimeUtc = lastWriteTime;
+        track.UpdatedAtUtc = now;
+        await UpsertTrackEntityAsync(connection, transaction, track, cancellationToken);
+        return track;
+    }
+
+    private async Task<LocalTrackEntity> UpsertTrackAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        LocalTrackImportData importedTrack,
+        CancellationToken cancellationToken)
+    {
+        var metadata = importedTrack.Metadata;
+        var now = DateTime.UtcNow;
+        var track = await GetTrackByLocalPathAsync(connection, transaction, importedTrack.FilePath, cancellationToken);
+
+        if (track == null)
+        {
+            track = new LocalTrackEntity
+            {
+                SourceType = SourceTypeLocalFile,
+                LocalPath = importedTrack.FilePath,
+                CreatedAtUtc = now
+            };
+        }
+
+        track.Title = metadata.Title;
+        track.Artist = metadata.Artist;
+        track.Album = metadata.Album;
+        track.DurationSeconds = metadata.DurationSeconds;
+        track.CoverPath = string.IsNullOrWhiteSpace(metadata.CoverPath) ? track.CoverPath : metadata.CoverPath;
+        track.RemoteUrl = null;
+        track.FileSize = importedTrack.FileSize;
+        track.LastWriteTimeUtc = importedTrack.LastWriteTimeUtc;
         track.UpdatedAtUtc = now;
         await UpsertTrackEntityAsync(connection, transaction, track, cancellationToken);
         return track;
@@ -1212,6 +1267,52 @@ public sealed class LocalMusicLibraryService(
         await InitializeAsync(cancellationToken);
     }
 
+    private async Task<IReadOnlyList<LocalTrackImportData>> PrepareLocalTrackBatchAsync(
+        IReadOnlyList<string> filePaths,
+        IReadOnlyDictionary<string, string>? legacySongCovers,
+        CancellationToken cancellationToken)
+    {
+        var tasks = new Task<LocalTrackImportData>[filePaths.Count];
+        for (var i = 0; i < filePaths.Count; i++)
+            tasks[i] = ReadTrackImportDataAsync(filePaths[i], GetLegacyCover(filePaths[i], legacySongCovers), cancellationToken);
+
+        return await Task.WhenAll(tasks);
+    }
+
+    private async Task<LocalTrackImportData> ReadTrackImportDataAsync(
+        string filePath,
+        string? explicitCoverPath,
+        CancellationToken cancellationToken)
+    {
+        return await Task.Run(() =>
+        {
+            var metadata = ReadMetadata(filePath, explicitCoverPath);
+            var lastWriteTime = System.IO.File.GetLastWriteTimeUtc(filePath);
+            var fileSize = new FileInfo(filePath).Length;
+            return new LocalTrackImportData(filePath, fileSize, lastWriteTime, metadata);
+        }, cancellationToken);
+    }
+
+    private static IEnumerable<IReadOnlyList<string>> EnumerateSupportedAudioFileBatches(string folderPath, int batchSize)
+    {
+        var batch = new List<string>(batchSize);
+        foreach (var filePath in Directory.EnumerateFiles(folderPath, "*.*", SearchOption.AllDirectories))
+        {
+            if (!IsSupportedAudioFile(filePath))
+                continue;
+
+            batch.Add(filePath);
+            if (batch.Count < batchSize)
+                continue;
+
+            yield return batch;
+            batch = new List<string>(batchSize);
+        }
+
+        if (batch.Count > 0)
+            yield return batch;
+    }
+
     private LocalTrackMetadata ReadMetadata(string filePath, string? explicitCoverPath)
     {
         var title = Path.GetFileNameWithoutExtension(filePath);
@@ -1307,6 +1408,12 @@ public sealed class LocalMusicLibraryService(
         string Album,
         double DurationSeconds,
         string? CoverPath);
+
+    private sealed record LocalTrackImportData(
+        string FilePath,
+        long FileSize,
+        DateTime LastWriteTimeUtc,
+        LocalTrackMetadata Metadata);
 
     private sealed record JellyfinAlbumGroup(
         string Key,
