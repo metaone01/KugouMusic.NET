@@ -1,5 +1,6 @@
 using System;
-using ZLinq;
+using System.Collections.Generic;
+using System.Globalization;
 using System.Threading.Tasks;
 using Avalonia.Collections;
 using Avalonia.Controls.Notifications;
@@ -9,34 +10,31 @@ using CommunityToolkit.Mvvm.Messaging;
 using KuGou.Net.Abstractions.Models;
 using KuGou.Net.Clients;
 using KugouAvaloniaPlayer.Models;
+using KugouAvaloniaPlayer.Services;
 using Microsoft.Extensions.Logging;
 using SukiUI.Toasts;
+using ZLinq;
 
 namespace KugouAvaloniaPlayer.ViewModels;
 
-public partial class PlaylistTag : ObservableObject
+public partial class DiscoverTopCard : ObservableObject
 {
     [ObservableProperty]
-    public partial int Index { get; set; }
+    public partial int CardId { get; set; }
 
     [ObservableProperty]
-    public partial int TagId { get; set; }
+    public partial string Cover { get; set; } = "avares://KugouAvaloniaPlayer/Assets/default_listcard.png";
 
     [ObservableProperty]
-    public partial string TagName { get; set; } = "";
-}
-
-public partial class PlaylistTagGroup : ObservableObject
-{
-    [ObservableProperty]
-    public partial int Index { get; set; }
+    public partial string Description { get; set; } = "";
 
     [ObservableProperty]
-    public partial int TagId { get; set; }
+    public partial string SongSummary { get; set; } = "";
 
     [ObservableProperty]
-    public partial string TagName { get; set; } = "";
-    public AvaloniaList<PlaylistTag> Son { get; } = new();
+    public partial string Title { get; set; } = "";
+
+    public AvaloniaList<SongItem> Songs { get; } = [];
 }
 
 public partial class DiscoverPlaylist : ObservableObject
@@ -58,18 +56,63 @@ public partial class DiscoverPlaylist : ObservableObject
 
     [ObservableProperty]
     public partial long PlayCount { get; set; }
+
+    public string PlayCountText => FormatPlayCount(PlayCount);
+
+    partial void OnPlayCountChanged(long value)
+    {
+        OnPropertyChanged(nameof(PlayCountText));
+    }
+
+    private static string FormatPlayCount(long value)
+    {
+        return value switch
+        {
+            >= 100_000_000 => $"{value / 100_000_000d:0.#}亿",
+            >= 10_000 => $"{value / 10_000d:0.#}万",
+            > 0 => value.ToString("N0", CultureInfo.CurrentCulture),
+            _ => ""
+        };
+    }
 }
 
 public partial class DiscoverViewModel : PageViewModelBase
 {
     private const string DefaultCardCover = "avares://KugouAvaloniaPlayer/Assets/default_listcard.png";
     private const string DefaultSongCover = "avares://KugouAvaloniaPlayer/Assets/default_song.png";
+    private const int PlaylistPageSize = 30;
     private const int PlaylistSongPageSize = 200;
+
+    private static readonly DiscoverTopCardDefinition[] TopCardDefinitions =
+    [
+        new(1, "私人专属好歌"),
+        new(2, "经典怀旧金曲"),
+        new(3, "热门好歌精选"),
+        new(4, "小众宝藏佳作"),
+        new(5, "潮流尝鲜"),
+        new(6, "VIP 专属推荐")
+    ];
+
     private readonly RecommendClient _discoveryClient;
+    private readonly IDiscoverTagViewModelFactory _discoverTagViewModelFactory;
     private readonly ILogger<DiscoverViewModel> _logger;
+    private readonly INavigationService _navigationService;
     private readonly PlaylistClient _playlistClient;
     private readonly ISukiToastManager _toastManager;
+    private DetailSource _detailSource = DetailSource.None;
     private bool _hasMoreSongs = true;
+    private int _playlistLoadVersion;
+    private int _songPage = 1;
+
+    [ObservableProperty]
+    public partial string DetailCover { get; set; } = DefaultCardCover;
+
+    [ObservableProperty]
+    public partial string DetailSubtitle { get; set; } = "";
+
+    [ObservableProperty]
+    public partial string DetailTitle { get; set; } = "";
+
     [ObservableProperty]
     public partial bool IsLoading { get; set; }
 
@@ -77,199 +120,59 @@ public partial class DiscoverViewModel : PageViewModelBase
     public partial bool IsLoadingMoreSongs { get; set; }
 
     [ObservableProperty]
-    public partial bool IsShowingSongs { get; set; }
-
-    private int _playlistLoadVersion;
+    public partial bool IsPlaylistsLoading { get; set; }
 
     [ObservableProperty]
-    public partial int SelectedMainIndex { get; set; }
+    public partial bool IsShowingSongs { get; set; }
+
+    [ObservableProperty]
+    public partial bool IsTopCardsLoading { get; set; }
 
     [ObservableProperty]
     public partial DiscoverPlaylist? SelectedPlaylist { get; set; }
 
     [ObservableProperty]
-    public partial int SelectedSubIndex { get; set; }
-
-    private int _songPage = 1;
-    private bool _suppressSelectionChanged;
+    public partial DiscoverTopCard? SelectedTopCard { get; set; }
 
     public DiscoverViewModel(
         PlaylistClient playlistClient,
         RecommendClient discoveryClient,
+        IDiscoverTagViewModelFactory discoverTagViewModelFactory,
+        INavigationService navigationService,
         ISukiToastManager toastManager,
         ILogger<DiscoverViewModel> logger)
     {
         _playlistClient = playlistClient;
         _discoveryClient = discoveryClient;
+        _discoverTagViewModelFactory = discoverTagViewModelFactory;
+        _navigationService = navigationService;
         _toastManager = toastManager;
         _logger = logger;
-        _ = LoadTagsAsync();
+        _ = LoadContentAsync();
     }
 
     public override string DisplayName => "发现";
     public override string Icon => "/Assets/tag-svgrepo-com.svg";
 
-    public AvaloniaList<PlaylistTagGroup> Categories { get; } = new();
-    public AvaloniaList<PlaylistTag> CurrentSubCategories { get; } = new();
-    public AvaloniaList<DiscoverPlaylist> Playlists { get; } = new();
-    public AvaloniaList<SongItem> SelectedPlaylistSongs { get; } = new();
+    public bool CanCollectSelectedPlaylist => SelectedPlaylist is not null;
+    public AvaloniaList<DiscoverPlaylist> Playlists { get; } = [];
+    public AvaloniaList<SongItem> SelectedDetailSongs { get; } = [];
+    public AvaloniaList<SongItem> SelectedPlaylistSongs => SelectedDetailSongs;
+    public AvaloniaList<DiscoverTopCard> TopCards { get; } = [];
 
-    [RelayCommand]
-    public async Task LoadTagsAsync()
+    partial void OnSelectedPlaylistChanged(DiscoverPlaylist? value)
     {
-        IsLoading = true;
-        try
-        {
-            var tags = await _playlistClient.GetTagsAsync();
-            Categories.Clear();
-            CurrentSubCategories.Clear();
-            Playlists.Clear();
-
-            if (tags == null || tags.Count == 0)
-                return;
-
-            foreach (var category in tags)
-            {
-                var group = new PlaylistTagGroup
-                {
-                    Index = Categories.Count,
-                    TagId = category.TagId,
-                    TagName = category.TagName
-                };
-
-                var subTags = category.Children
-                    .AsValueEnumerable().OrderBy(x => x.Sort)
-                    .Select((x, idx) => new PlaylistTag
-                    {
-                        Index = idx,
-                        TagId = x.TagId,
-                        TagName = x.TagName
-                    })
-                    .ToList();
-
-                if (subTags.Count != 0)
-                    group.Son.AddRange(subTags);
-
-                Categories.Add(group);
-            }
-
-            if (Categories.Count == 0)
-                return;
-
-            _suppressSelectionChanged = true;
-            SelectedMainIndex = 0;
-            ResetCurrentSubCategories(0);
-            SelectedSubIndex = 0;
-            _suppressSelectionChanged = false;
-
-            if (CurrentSubCategories.Count == 0)
-                return;
-
-            var defaultTagId = CurrentSubCategories[0].TagId;
-            await LoadPlaylistsAsync(defaultTagId);
-        }
-        catch (Exception ex)
-        {
-            ShowWarning("加载标签失败", ex.Message);
-        }
-        finally
-        {
-            IsLoading = false;
-        }
+        OnPropertyChanged(nameof(CanCollectSelectedPlaylist));
     }
 
-    partial void OnSelectedMainIndexChanged(int value)
+    public async Task LoadContentAsync()
     {
-        if (_suppressSelectionChanged)
-            return;
-        _ = HandleMainCategoryChanged(value);
-    }
-
-    partial void OnSelectedSubIndexChanged(int value)
-    {
-        if (_suppressSelectionChanged)
-            return;
-        _ = HandleSubCategoryChanged(value);
-    }
-
-    [RelayCommand]
-    private void SelectMainCategory(int index)
-    {
-        if (index < 0 || index >= Categories.Count)
-            return;
-        SelectedMainIndex = index;
-    }
-
-    [RelayCommand]
-    private void SelectSubCategory(int index)
-    {
-        if (index < 0 || index >= CurrentSubCategories.Count)
-            return;
-        SelectedSubIndex = index;
-    }
-
-    private void ResetCurrentSubCategories(int mainIndex)
-    {
-        CurrentSubCategories.Clear();
-
-        if (mainIndex < 0 || mainIndex >= Categories.Count)
-            return;
-
-        if (Categories[mainIndex].Son.Count > 0)
-            CurrentSubCategories.AddRange(Categories[mainIndex].Son);
-    }
-
-    private async Task HandleMainCategoryChanged(int index)
-    {
-        if (index < 0 || index >= Categories.Count)
-            return;
-
-        ResetCurrentSubCategories(index);
-
-        _suppressSelectionChanged = true;
-        SelectedSubIndex = 0;
-        _suppressSelectionChanged = false;
-
-        if (CurrentSubCategories.Count == 0)
-        {
-            Playlists.Clear();
-            return;
-        }
-
-        await LoadPlaylistsAsync(CurrentSubCategories[0].TagId);
-    }
-
-    private async Task HandleSubCategoryChanged(int index)
-    {
-        if (index < 0 || index >= CurrentSubCategories.Count)
-            return;
-
-        await LoadPlaylistsAsync(CurrentSubCategories[index].TagId);
-    }
-
-    private async Task LoadPlaylistsAsync(int tagId, int withSong = 0)
-    {
-        _ = withSong;
         var version = ++_playlistLoadVersion;
         IsLoading = true;
+
         try
         {
-            var result = await _discoveryClient.GetRecommendedPlaylistsAsync(tagId);
-            if (version != _playlistLoadVersion)
-                return;
-
-            Playlists.Clear();
-
-            if (result?.Playlists == null || result.Playlists.Count == 0)
-                return;
-
-            var items = result.Playlists.AsValueEnumerable().Select(MapDiscoverPlaylist).ToList();
-            Playlists.AddRange(items);
-        }
-        catch (Exception ex)
-        {
-            if (version == _playlistLoadVersion)
-                ShowWarning("加载推荐歌单失败", ex.Message);
+            await Task.WhenAll(LoadTopCardsAsync(), LoadRecommendedPlaylistsAsync(version));
         }
         finally
         {
@@ -279,14 +182,54 @@ public partial class DiscoverViewModel : PageViewModelBase
     }
 
     [RelayCommand]
+    private async Task RefreshDiscovery()
+    {
+        await LoadContentAsync();
+    }
+
+    [RelayCommand]
+    private void OpenPlaylistTags()
+    {
+        _navigationService.NavigateTransient(_discoverTagViewModelFactory.Create());
+    }
+
+    [RelayCommand]
+    private void OpenTopCard(DiscoverTopCard? card)
+    {
+        if (card == null || card.Songs.Count == 0)
+            return;
+
+        _detailSource = DetailSource.TopCard;
+        SelectedTopCard = card;
+        SelectedPlaylist = null;
+        DetailTitle = card.Title;
+        DetailSubtitle = string.IsNullOrWhiteSpace(card.Description)
+            ? $"{card.Songs.Count} 首歌曲"
+            : card.Description;
+        DetailCover = string.IsNullOrWhiteSpace(card.Cover) ? DefaultCardCover : card.Cover;
+
+        SelectedDetailSongs.Clear();
+        SelectedDetailSongs.AddRange(card.Songs);
+        IsShowingSongs = true;
+        _hasMoreSongs = false;
+        IsLoadingMoreSongs = false;
+    }
+
+    [RelayCommand]
     private async Task OpenPlaylist(DiscoverPlaylist? playlist)
     {
         if (playlist is null || string.IsNullOrWhiteSpace(playlist.GlobalId))
             return;
 
+        _detailSource = DetailSource.Playlist;
         SelectedPlaylist = playlist;
+        SelectedTopCard = null;
+        DetailTitle = playlist.Name;
+        DetailSubtitle = string.IsNullOrWhiteSpace(playlist.CreatorName) ? "推荐歌单" : $"by {playlist.CreatorName}";
+        DetailCover = string.IsNullOrWhiteSpace(playlist.Cover) ? DefaultCardCover : playlist.Cover;
+
+        SelectedDetailSongs.Clear();
         IsShowingSongs = true;
-        SelectedPlaylistSongs.Clear();
 
         _songPage = 1;
         _hasMoreSongs = true;
@@ -333,17 +276,90 @@ public partial class DiscoverViewModel : PageViewModelBase
     {
         IsShowingSongs = false;
         SelectedPlaylist = null;
-        SelectedPlaylistSongs.Clear();
+        SelectedTopCard = null;
+        SelectedDetailSongs.Clear();
+        DetailTitle = "";
+        DetailSubtitle = "";
+        DetailCover = DefaultCardCover;
+        _detailSource = DetailSource.None;
     }
 
     [RelayCommand]
     private async Task LoadMoreSongs()
     {
-        if (IsLoadingMoreSongs || !_hasMoreSongs || SelectedPlaylist == null)
+        if (_detailSource != DetailSource.Playlist || IsLoadingMoreSongs || !_hasMoreSongs || SelectedPlaylist == null)
             return;
 
         _songPage++;
         await LoadMoreSongsInternal();
+    }
+
+    private async Task LoadTopCardsAsync()
+    {
+        IsTopCardsLoading = true;
+        try
+        {
+            var cardTasks = TopCardDefinitions
+                .AsValueEnumerable()
+                .Select(LoadTopCardAsync)
+                .ToArray();
+            var loadedCards = await Task.WhenAll(cardTasks);
+            var cards = loadedCards
+                .AsValueEnumerable()
+                .Where(card => card is { Songs.Count: > 0 })
+                .Select(card => card!)
+                .ToList();
+
+            TopCards.Clear();
+            TopCards.AddRange(cards);
+        }
+        finally
+        {
+            IsTopCardsLoading = false;
+        }
+    }
+
+    private async Task<DiscoverTopCard?> LoadTopCardAsync(DiscoverTopCardDefinition definition)
+    {
+        try
+        {
+            var response = await _discoveryClient.GetTopCardAsync(definition.CardId);
+            return MapTopCard(definition, response);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "加载发现推荐卡失败。cardId={CardId}", definition.CardId);
+            return null;
+        }
+    }
+
+    private async Task LoadRecommendedPlaylistsAsync(int version)
+    {
+        IsPlaylistsLoading = true;
+        try
+        {
+            var result = await _discoveryClient.GetRecommendedPlaylistsAsync(page: 1, pageSize: PlaylistPageSize);
+            if (version != _playlistLoadVersion)
+                return;
+
+            Playlists.Clear();
+
+            if (result?.Playlists == null || result.Playlists.Count == 0)
+                return;
+
+            var items = result.Playlists.AsValueEnumerable().Select(MapDiscoverPlaylist).ToList();
+            Playlists.AddRange(items);
+        }
+        catch (Exception ex)
+        {
+            if (version == _playlistLoadVersion)
+                ShowWarning("加载推荐歌单失败", ex.Message);
+        }
+        finally
+        {
+            if (version == _playlistLoadVersion)
+                IsPlaylistsLoading = false;
+        }
     }
 
     private async Task LoadMoreSongsInternal()
@@ -363,7 +379,9 @@ public partial class DiscoverViewModel : PageViewModelBase
                 return;
             }
 
-            if (data.Status != 1) _logger.LogError("Error : {data.ErrorCode}" , data.ErrorCode);
+            if (data.Status != 1)
+                _logger.LogError("Error : {ErrorCode}", data.ErrorCode);
+
             var songs = data.Songs;
             if (songs.Count < PlaylistSongPageSize)
                 _hasMoreSongs = false;
@@ -382,7 +400,7 @@ public partial class DiscoverViewModel : PageViewModelBase
             }).ToList();
 
             if (songItems.Count > 0)
-                SelectedPlaylistSongs.AddRange(songItems);
+                SelectedDetailSongs.AddRange(songItems);
         }
         catch
         {
@@ -394,11 +412,70 @@ public partial class DiscoverViewModel : PageViewModelBase
         }
     }
 
-    private DiscoverPlaylist MapDiscoverPlaylist(RecommendPlaylistItem item)
+    private static DiscoverTopCard MapTopCard(DiscoverTopCardDefinition definition, TopCardResponse? response)
+    {
+        var card = new DiscoverTopCard
+        {
+            CardId = definition.CardId,
+            Title = definition.Title,
+            Cover = string.IsNullOrWhiteSpace(response?.Cover) ? DefaultCardCover : response.Cover,
+            Description = response?.RecommendDescription ?? ""
+        };
+
+        if (response?.Songs == null || response.Songs.Count == 0)
+            return card;
+
+        var songs = response.Songs.AsValueEnumerable().Select(MapTopCardSong).ToList();
+        card.Songs.AddRange(songs);
+
+        var firstSong = songs.AsValueEnumerable().FirstOrDefault();
+        card.SongSummary = firstSong == null
+            ? $"{songs.Count} 首歌曲"
+            : $"{firstSong.Name} · {firstSong.Singer}";
+
+        if (string.IsNullOrWhiteSpace(card.Description))
+            card.Description = card.SongSummary;
+
+        return card;
+    }
+
+    private static SongItem MapTopCardSong(TopCardSong item)
+    {
+        var singers = ResolveTopCardSingers(item);
+        var singerText = singers.Count > 0
+            ? string.Join("、", singers.AsValueEnumerable().Select(singer => singer.Name).ToArray())
+            : string.IsNullOrWhiteSpace(item.SingerName) ? "未知" : item.SingerName;
+
+        return new SongItem
+        {
+            Name = item.Name,
+            Singer = singerText,
+            Hash = item.Hash,
+            AlbumId = item.AlbumId.ToString(CultureInfo.InvariantCulture),
+            AlbumName = item.AlbumName,
+            AudioId = item.AudioId,
+            AlbumAudioId = long.TryParse(item.MixSongId, NumberStyles.Integer, CultureInfo.InvariantCulture, out var albumAudioId)
+                ? albumAudioId
+                : 0,
+            Singers = singers,
+            Cover = string.IsNullOrWhiteSpace(item.SizableCover) ? DefaultSongCover : item.SizableCover,
+            DurationSeconds = item.Duration
+        };
+    }
+
+    private static List<SingerLite> ResolveTopCardSingers(TopCardSong item)
+    {
+        return item.Singers
+            .AsValueEnumerable()
+            .Where(singer => singer.Id > 0 && !string.IsNullOrWhiteSpace(singer.Name))
+            .ToList();
+    }
+
+    private static DiscoverPlaylist MapDiscoverPlaylist(RecommendPlaylistItem item)
     {
         return new DiscoverPlaylist
         {
-            Id = item.ListId.ToString(),
+            Id = item.ListId.ToString(CultureInfo.InvariantCulture),
             GlobalId = item.GlobalId,
             Name = item.Name,
             Cover = string.IsNullOrWhiteSpace(item.Cover) ? DefaultCardCover : item.Cover!,
@@ -416,5 +493,14 @@ public partial class DiscoverViewModel : PageViewModelBase
             .Dismiss().After(TimeSpan.FromSeconds(3))
             .Dismiss().ByClicking()
             .Queue();
+    }
+
+    private readonly record struct DiscoverTopCardDefinition(int CardId, string Title);
+
+    private enum DetailSource
+    {
+        None,
+        TopCard,
+        Playlist
     }
 }

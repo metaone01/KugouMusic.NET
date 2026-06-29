@@ -9,120 +9,271 @@
              x:Name="DiscoverRoot"
              x:DataType="vm:DiscoverViewModel">
 
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Light">
+                    <SolidColorBrush x:Key="DiscoverSectionTitleBrush" Color="#13213B" />
+                    <SolidColorBrush x:Key="DiscoverSectionCaptionBrush" Color="#6F7A93" />
+                    <SolidColorBrush x:Key="DiscoverCardTextBrush" Color="White" />
+                    <SolidColorBrush x:Key="DiscoverCardMutedTextBrush" Color="#E3E9F7" />
+                    <SolidColorBrush x:Key="DiscoverTopCardBorderBrush" Color="#30FFFFFF" />
+                    <SolidColorBrush x:Key="DiscoverTopCardOverlayBrush" Color="#8A101827" />
+                    <SolidColorBrush x:Key="DiscoverScrollButtonBrush" Color="#EAF0FA" />
+                    <SolidColorBrush x:Key="DiscoverScrollButtonHoverBrush" Color="#DCE6F6" />
+                </ResourceDictionary>
+
+                <ResourceDictionary x:Key="Dark">
+                    <SolidColorBrush x:Key="DiscoverSectionTitleBrush" Color="#F1F5FF" />
+                    <SolidColorBrush x:Key="DiscoverSectionCaptionBrush" Color="#9DA9C3" />
+                    <SolidColorBrush x:Key="DiscoverCardTextBrush" Color="White" />
+                    <SolidColorBrush x:Key="DiscoverCardMutedTextBrush" Color="#D7DEF0" />
+                    <SolidColorBrush x:Key="DiscoverTopCardBorderBrush" Color="#24FFFFFF" />
+                    <SolidColorBrush x:Key="DiscoverTopCardOverlayBrush" Color="#9A080F1A" />
+                    <SolidColorBrush x:Key="DiscoverScrollButtonBrush" Color="#273149" />
+                    <SolidColorBrush x:Key="DiscoverScrollButtonHoverBrush" Color="#34405C" />
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
     <UserControl.Styles>
-        <Style Selector="ItemsRepeater.MainTagList ContentPresenter">
-            <Setter Property="Margin" Value="0,0,6,0" />
+        <Style Selector="Button.DiscoverScrollButton">
+            <Setter Property="Width" Value="38" />
+            <Setter Property="Height" Value="38" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="CornerRadius" Value="19" />
+            <Setter Property="Background" Value="{DynamicResource DiscoverScrollButtonBrush}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
         </Style>
-        <Style Selector="ItemsRepeater.MainTagList TextBlock">
-            <Setter Property="FontSize" Value="15" />
-            <Setter Property="FontWeight" Value="SemiBold" />
+        <Style Selector="Button.DiscoverScrollButton:pointerover">
+            <Setter Property="Background" Value="{DynamicResource DiscoverScrollButtonHoverBrush}" />
         </Style>
 
-        <Style Selector="ItemsRepeater.SubTagList ContentPresenter">
-            <Setter Property="Margin" Value="0,0,6,0" />
+        <Style Selector="Button.TopRecommendCard">
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
         </Style>
-        <Style Selector="ItemsRepeater.SubTagList TextBlock">
-            <Setter Property="FontSize" Value="14" />
+        <Style Selector="Button.TopRecommendCard:pointerover">
+            <Setter Property="RenderTransform" Value="translateY(-3px)" />
         </Style>
     </UserControl.Styles>
 
     <Grid Margin="15">
-        <Grid IsVisible="{Binding !IsShowingSongs}" RowDefinitions="Auto,Auto,*">
-            <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="15" Margin="0,0,0,12">
-                <TextBlock Text="发现歌单" FontSize="28" FontWeight="ExtraBold" />
-                <Button Classes="Basic" Command="{Binding LoadTagsCommand}" Cursor="Hand">
-                    <PathIcon Data="{x:Static suki:Icons.Refresh}" Foreground="{DynamicResource SukiLowText}" />
-                </Button>
-            </StackPanel>
+        <Grid IsVisible="{Binding !IsShowingSongs}">
+            <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                          VerticalScrollBarVisibility="Auto"
+                          Padding="0,0,0,40">
+                <StackPanel Spacing="26">
+                    <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,-4">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="发现"
+                                       FontSize="30"
+                                       FontWeight="ExtraBold"
+                                       Foreground="{DynamicResource DiscoverSectionTitleBrush}" />
+                            <TextBlock Text="为你挑出今天值得打开的歌"
+                                       FontSize="14"
+                                       Foreground="{DynamicResource DiscoverSectionCaptionBrush}" />
+                        </StackPanel>
 
-            <StackPanel Grid.Row="1" Spacing="15" Margin="0,0,0,12">
-                <ScrollViewer HorizontalScrollBarVisibility="Auto"
-                              VerticalScrollBarVisibility="Disabled">
-                    <ItemsRepeater Classes="MainTagList"
-                                   ItemsSource="{Binding Categories}">
-                        <ItemsRepeater.Layout>
-                            <StackLayout Orientation="Horizontal" Spacing="6" />
-                        </ItemsRepeater.Layout>
-                        <ItemsRepeater.ItemTemplate>
-                            <DataTemplate DataType="vm:PlaylistTagGroup">
-                                <RadioButton Classes="Segmented"
-                                             GroupName="MainTags"
-                                             IsChecked="{Binding #DiscoverRoot.((vm:DiscoverViewModel)DataContext).SelectedMainIndex, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={Binding Index}}"
-                                             Command="{Binding #DiscoverRoot.((vm:DiscoverViewModel)DataContext).SelectMainCategoryCommand}"
-                                             CommandParameter="{Binding Index}">
-                                    <TextBlock Text="{Binding TagName}" VerticalAlignment="Center" />
-                                </RadioButton>
-                            </DataTemplate>
-                        </ItemsRepeater.ItemTemplate>
-                    </ItemsRepeater>
-                </ScrollViewer>
+                        <Button Grid.Column="1"
+                                Classes="Basic"
+                                Command="{Binding RefreshDiscoveryCommand}"
+                                Cursor="Hand"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                ToolTip.Tip="刷新">
+                            <PathIcon Data="{x:Static suki:Icons.Refresh}"
+                                      Foreground="{DynamicResource SukiLowText}"
+                                      Width="18"
+                                      Height="18" />
+                        </Button>
+                    </Grid>
 
-                <ScrollViewer HorizontalScrollBarVisibility="Auto"
-                              VerticalScrollBarVisibility="Disabled">
-                    <ItemsRepeater Classes="SubTagList"
-                                   ItemsSource="{Binding CurrentSubCategories}">
-                        <ItemsRepeater.Layout>
-                            <StackLayout Orientation="Horizontal" Spacing="6" />
-                        </ItemsRepeater.Layout>
-                        <ItemsRepeater.ItemTemplate>
-                            <DataTemplate DataType="vm:PlaylistTag">
-                                <RadioButton Classes="Segmented"
-                                             GroupName="SubTags"
-                                             IsChecked="{Binding #DiscoverRoot.((vm:DiscoverViewModel)DataContext).SelectedSubIndex, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={Binding Index}}"
-                                             Command="{Binding #DiscoverRoot.((vm:DiscoverViewModel)DataContext).SelectSubCategoryCommand}"
-                                             CommandParameter="{Binding Index}">
-                                    <TextBlock Text="{Binding TagName}" VerticalAlignment="Center" />
-                                </RadioButton>
-                            </DataTemplate>
-                        </ItemsRepeater.ItemTemplate>
-                    </ItemsRepeater>
-                </ScrollViewer>
-            </StackPanel>
+                    <Grid RowDefinitions="Auto,Auto" RowSpacing="12">
+                        <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                            <TextBlock Text="推荐歌曲"
+                                       FontSize="21"
+                                       FontWeight="Bold"
+                                       Foreground="{DynamicResource DiscoverSectionTitleBrush}" />
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                                <Button Classes="DiscoverScrollButton"
+                                        Click="OnTopCardsScrollLeft">
+                                    <PathIcon Data="{x:Static suki:Icons.ChevronLeft}"
+                                              Foreground="{DynamicResource SukiText}" />
+                                </Button>
+                                <Button Classes="DiscoverScrollButton"
+                                        Click="OnTopCardsScrollRight">
+                                    <PathIcon Data="{x:Static suki:Icons.ChevronRight}"
+                                              Foreground="{DynamicResource SukiText}" />
+                                </Button>
+                            </StackPanel>
+                        </Grid>
 
-            <Grid Grid.Row="2">
-                <StackPanel Orientation="Horizontal"
-                            HorizontalAlignment="Center"
-                            VerticalAlignment="Center"
-                            Spacing="10"
-                            IsVisible="{Binding IsLoading}">
-                    <suki:Loading Width="24" Height="24" />
-                    <TextBlock Text="正在加载歌单..." VerticalAlignment="Center"
-                               Foreground="{DynamicResource SukiLiquid2}" />
+                        <Grid Grid.Row="1">
+                            <StackPanel Orientation="Horizontal"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"
+                                        IsVisible="{Binding IsTopCardsLoading}">
+                                <suki:Loading Width="26" Height="26" />
+                            </StackPanel>
+
+                            <ScrollViewer x:Name="TopCardsScrollViewer"
+                                          IsVisible="{Binding !IsTopCardsLoading}"
+                                          HorizontalScrollBarVisibility="Hidden"
+                                          VerticalScrollBarVisibility="Disabled">
+                                <ItemsRepeater ItemsSource="{Binding TopCards}">
+                                    <ItemsRepeater.Layout>
+                                        <StackLayout Orientation="Horizontal" Spacing="16" />
+                                    </ItemsRepeater.Layout>
+                                    <ItemsRepeater.ItemTemplate>
+                                        <DataTemplate DataType="vm:DiscoverTopCard">
+                                            <Button Classes="TopRecommendCard"
+                                                    Width="184"
+                                                    Height="184"
+                                                    Command="{Binding #DiscoverRoot.((vm:DiscoverViewModel)DataContext).OpenTopCardCommand}"
+                                                    CommandParameter="{Binding .}">
+                                                <Border CornerRadius="14"
+                                                        ClipToBounds="True"
+                                                        BorderBrush="{DynamicResource DiscoverTopCardBorderBrush}"
+                                                        BorderThickness="1">
+                                                    <Grid>
+                                                        <Image asyncImageLoader:ImageLoader.Source="{Binding Cover}"
+                                                               behaviors:ImageRenderOptions.InterpolationSource="{Binding Cover}"
+                                                               Stretch="UniformToFill" />
+                                                        <Border Background="{DynamicResource DiscoverTopCardOverlayBrush}" />
+                                                        <Border VerticalAlignment="Bottom" Height="106">
+                                                            <Border.Background>
+                                                                <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,100%">
+                                                                    <GradientStop Color="#00101827" Offset="0" />
+                                                                    <GradientStop Color="#D8101827" Offset="1" />
+                                                                </LinearGradientBrush>
+                                                            </Border.Background>
+                                                        </Border>
+
+                                                        <Grid RowDefinitions="Auto,*,Auto" Margin="12">
+                                                            <TextBlock Text="{Binding Title}"
+                                                                       FontSize="18"
+                                                                       FontWeight="ExtraBold"
+                                                                       Foreground="{DynamicResource DiscoverCardTextBrush}"
+                                                                       TextTrimming="CharacterEllipsis" />
+
+                                                            <Border Grid.Row="2"
+                                                                    CornerRadius="9"
+                                                                    Background="#33000000"
+                                                                    Padding="8,6">
+                                                                <StackPanel Spacing="2">
+                                                                    <TextBlock Text="{Binding SongSummary}"
+                                                                               FontSize="12"
+                                                                               FontWeight="SemiBold"
+                                                                               Foreground="{DynamicResource DiscoverCardMutedTextBrush}"
+                                                                               MaxWidth="140"
+                                                                               MaxLines="1"
+                                                                               TextWrapping="NoWrap"
+                                                                               TextTrimming="CharacterEllipsis" />
+                                                                    <TextBlock Text="{Binding Description}"
+                                                                               FontSize="11"
+                                                                               Foreground="#C9D2E8"
+                                                                               MaxWidth="140"
+                                                                               MaxLines="1"
+                                                                               TextWrapping="NoWrap"
+                                                                               TextTrimming="CharacterEllipsis" />
+                                                                </StackPanel>
+                                                            </Border>
+                                                        </Grid>
+                                                    </Grid>
+                                                </Border>
+                                            </Button>
+                                        </DataTemplate>
+                                    </ItemsRepeater.ItemTemplate>
+                                </ItemsRepeater>
+                            </ScrollViewer>
+                        </Grid>
+                    </Grid>
+
+                    <Grid RowDefinitions="Auto,Auto" RowSpacing="12">
+                        <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                            <Button Classes="Basic"
+                                    Padding="0"
+                                    HorizontalAlignment="Left"
+                                    VerticalAlignment="Center"
+                                    Cursor="Hand"
+                                    Command="{Binding OpenPlaylistTagsCommand}">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <TextBlock Text="推荐歌单"
+                                               FontSize="21"
+                                               FontWeight="Bold"
+                                               Foreground="{DynamicResource DiscoverSectionTitleBrush}" />
+                                    <PathIcon Data="{x:Static suki:Icons.ChevronRight}"
+                                              Foreground="{DynamicResource SukiLowText}"
+                                              Width="15"
+                                              Height="15"
+                                              VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                                <Button Classes="DiscoverScrollButton"
+                                        Click="OnPlaylistsScrollLeft">
+                                    <PathIcon Data="{x:Static suki:Icons.ChevronLeft}"
+                                              Foreground="{DynamicResource SukiText}" />
+                                </Button>
+                                <Button Classes="DiscoverScrollButton"
+                                        Click="OnPlaylistsScrollRight">
+                                    <PathIcon Data="{x:Static suki:Icons.ChevronRight}"
+                                              Foreground="{DynamicResource SukiText}" />
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid Grid.Row="1" MinHeight="220">
+                            <StackPanel Orientation="Horizontal"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"
+                                        IsVisible="{Binding IsPlaylistsLoading}">
+                                <suki:Loading Width="26" Height="26" />
+                            </StackPanel>
+
+                            <ScrollViewer x:Name="PlaylistsScrollViewer"
+                                          IsVisible="{Binding !IsPlaylistsLoading}"
+                                          HorizontalScrollBarVisibility="Hidden"
+                                          VerticalScrollBarVisibility="Disabled">
+                                <ItemsRepeater ItemsSource="{Binding Playlists}">
+                                    <ItemsRepeater.Layout>
+                                        <StackLayout Orientation="Horizontal" Spacing="16" />
+                                    </ItemsRepeater.Layout>
+                                    <ItemsRepeater.ItemTemplate>
+                                        <DataTemplate DataType="vm:DiscoverPlaylist">
+                                            <localControls:MediaCard Width="156"
+                                                                     Cover="{Binding Cover}"
+                                                                     Title="{Binding Name}"
+                                                                     Subtitle="{Binding PlayCountText}"
+                                                                     Command="{Binding #DiscoverRoot.((vm:DiscoverViewModel)DataContext).OpenPlaylistCommand}"
+                                                                     CommandParameter="{Binding .}" />
+                                        </DataTemplate>
+                                    </ItemsRepeater.ItemTemplate>
+                                </ItemsRepeater>
+                            </ScrollViewer>
+                        </Grid>
+                    </Grid>
                 </StackPanel>
-
-                <ScrollViewer IsVisible="{Binding !IsLoading}" Padding="0,0,0,-50">
-                    <ItemsRepeater ItemsSource="{Binding Playlists}">
-                        <ItemsRepeater.Layout>
-                            <UniformGridLayout MinItemWidth="184"
-                                               MinItemHeight="236"
-                                               MinColumnSpacing="0"
-                                               MinRowSpacing="0" />
-                        </ItemsRepeater.Layout>
-                        <ItemsRepeater.ItemTemplate>
-                            <DataTemplate DataType="vm:DiscoverPlaylist">
-                                <localControls:MediaCard Cover="{Binding Cover}"
-                                                         Title="{Binding Name}"
-                                                         Subtitle="{Binding PlayCount, StringFormat='播放 {0}'}"
-                                                         Command="{Binding #DiscoverRoot.((vm:DiscoverViewModel)DataContext).OpenPlaylistCommand}"
-                                                         CommandParameter="{Binding .}" />
-                            </DataTemplate>
-                        </ItemsRepeater.ItemTemplate>
-                    </ItemsRepeater>
-                </ScrollViewer>
-            </Grid>
+            </ScrollViewer>
         </Grid>
 
         <localControls:SongCollectionDetailView
             IsVisible="{Binding IsShowingSongs}"
-            Cover="{Binding SelectedPlaylist.Cover}"
-            Title="{Binding SelectedPlaylist.Name}"
-            Subtitle="{Binding SelectedPlaylist.CreatorName, StringFormat='by {0}'}"
-            Songs="{Binding SelectedPlaylistSongs}"
+            Cover="{Binding DetailCover}"
+            Title="{Binding DetailTitle}"
+            Subtitle="{Binding DetailSubtitle}"
+            Songs="{Binding SelectedDetailSongs}"
             LoadMoreCommand="{Binding LoadMoreSongsCommand}"
             BackCommand="{Binding GoBackCommand}"
             IsLoadingMore="{Binding IsLoadingMoreSongs}"
             ShowAddLoadedSongsToQueueButton="True"
             HeroActionCommand="{Binding CollectPlaylistCommand}"
+            HeroActionIsVisible="{Binding CanCollectSelectedPlaylist}"
             HeroActionIconData="{x:Static suki:Icons.Star}" />
     </Grid>
 </UserControl>

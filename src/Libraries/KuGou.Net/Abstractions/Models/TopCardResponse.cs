@@ -31,6 +31,12 @@ public record TopCardResponse : KgBaseModel
 
     [JsonPropertyName("card_id")]
     public int CardId { get; set; }
+    
+    /// <summary>
+    /// 卡片封面，自动提取第一首歌的封面
+    /// </summary>
+    [JsonIgnore]
+    public string Cover => Songs.FirstOrDefault()?.SizableCover ?? "";
 }
 
 /// <summary>
@@ -82,22 +88,39 @@ public record TopCardSong : KgBaseModel
             if (!SingerInfoRaw.HasValue)
                 return [];
 
-            try
-            {
-                return SingerInfoRaw.Value.Deserialize<List<SingerLite>>() ?? [];
-            }
-            catch
-            {
-                try
-                {
-                    var single = SingerInfoRaw.Value.Deserialize<SingerLite>();
-                    return single != null ? [single] : [];
-                }
-                catch
-                {
-                    return [];
-                }
-            }
+            return SingerInfoRaw.Value.ValueKind == JsonValueKind.Array
+                ? ParseSingerArray(SingerInfoRaw.Value)
+                : ParseSingerObject(SingerInfoRaw.Value);
         }
+    }
+
+    private static List<SingerLite> ParseSingerArray(JsonElement value)
+    {
+        var singers = new List<SingerLite>();
+        foreach (var item in value.EnumerateArray())
+        {
+            var singer = ParseSingerObject(item);
+            if (singer.Count > 0)
+                singers.AddRange(singer);
+        }
+
+        return singers;
+    }
+
+    private static List<SingerLite> ParseSingerObject(JsonElement value)
+    {
+        if (value.ValueKind != JsonValueKind.Object)
+            return [];
+
+        var id = value.TryGetProperty("id", out var idElement) && idElement.TryGetInt64(out var parsedId)
+            ? parsedId
+            : 0;
+        var name = value.TryGetProperty("name", out var nameElement)
+            ? nameElement.GetString() ?? ""
+            : "";
+
+        return string.IsNullOrWhiteSpace(name)
+            ? []
+            : [new SingerLite { Id = id, Name = name }];
     }
 }

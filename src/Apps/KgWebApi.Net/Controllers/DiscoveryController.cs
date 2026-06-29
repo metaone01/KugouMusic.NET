@@ -49,7 +49,7 @@ public class DiscoveryController(RecommendClient recommendClient) : ControllerBa
         return Ok(res);
     }
 
-    /*/// <summary>
+    /// <summary>
     ///     风格推荐
     /// </summary>
     [HttpGet("everyday/style/recommend")]
@@ -57,7 +57,7 @@ public class DiscoveryController(RecommendClient recommendClient) : ControllerBa
     {
         var res = await recommendClient.GetRecommendedStyleSongsAsync();
         return Ok(res);
-    }*/
+    }
 
     /// <summary>
     ///     AI 推荐。
@@ -122,7 +122,7 @@ public class DiscoveryController(RecommendClient recommendClient) : ControllerBa
     /// <summary>
     ///     歌曲推荐。
     /// </summary>
-    /// <param name="cardId">推荐卡片 id。1：对应安卓 精选好歌随心听 || 私人专属好歌，2：对应安卓 经典怀旧金曲，3：对应安卓 热门好歌精选，4：对应安卓 小众宝藏佳作，5：未知，6：对应 vip 专属推荐</param>
+    /// <param name="cardId">推荐卡片 id。1： 私人专属好歌，2：经典怀旧金曲，3： 热门好歌精选，4： 小众宝藏佳作，5：潮流尝鲜，6： vip 专属推荐</param>
     /// <returns>歌曲推荐内容。</returns>
     [HttpGet("top/card")]
     [ProducesResponseType(typeof(TopCardResponse), StatusCodes.Status200OK)]

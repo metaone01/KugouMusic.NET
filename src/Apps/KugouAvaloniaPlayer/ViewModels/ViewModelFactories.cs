@@ -31,6 +31,30 @@ public sealed class SingerViewModelFactory(
     }
 }
 
+public interface IDiscoverTagViewModelFactory
+{
+    DiscoverTagViewModel Create();
+}
+
+public sealed class DiscoverTagViewModelFactory(
+    PlaylistClient playlistClient,
+    RecommendClient discoveryClient,
+    KugouAvaloniaPlayer.Services.INavigationService navigationService,
+    ISukiToastManager toastManager,
+    ILogger<DiscoverTagViewModel> logger)
+    : IDiscoverTagViewModelFactory
+{
+    public DiscoverTagViewModel Create()
+    {
+        return new DiscoverTagViewModel(
+            playlistClient,
+            discoveryClient,
+            navigationService,
+            toastManager,
+            logger);
+    }
+}
+
 public interface IDesktopLyricViewModelFactory
 {
     DesktopLyricViewModel Create();
