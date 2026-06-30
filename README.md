@@ -10,6 +10,7 @@
     <a href="https://github.com/Linsxyx/KugouMusic.NET/releases"><img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-brightgreen.svg" alt="Platform" /></a>
     <a href="https://github.com/Linsxyx/KugouMusic.NET/releases"><img src="https://img.shields.io/github/v/release/Linsxyx/KugouMusic.NET" alt="Release" /></a>
     <a href="https://github.com/Linsxyx/KugouMusic.NET/releases"><img src="https://img.shields.io/github/downloads/Linsxyx/KugouMusic.NET/total?label=download" alt="Downloads" /></a>
+    <a href="https://github.com/Linsxyx/KugouMusic.NET/stargazers"><img src="https://img.shields.io/github/stars/Linsxyx/KugouMusic.NET?style=flat&color=yellow" alt="GitHub stars" /></a>
   </p>
 
   <p>
@@ -122,7 +123,7 @@ xattr -dr com.apple.quarantine /Applications/KugouAvaloniaPlayer.app
 - 本地音乐库首页，集中管理本地歌单、导入文件夹和 Jellyfin 媒体库
 - 新建、编辑、删除本地歌单
 - 向本地歌单追加本地歌曲文件
-- 可导入本地音乐文件夹，并保留为可刷新的本地歌单
+- 可导入本地音乐文件夹，上千首歌曲也能快速导入
 - 支持刷新已导入的本地文件夹和 Jellyfin 媒体库
 - 支持为本地歌单和本地歌曲设置封面
 - 支持从 Jellyfin 导入音乐媒体库，按专辑同步为多个本地歌单
@@ -279,3 +280,13 @@ KugouMusic.NET
 - **使用限制**：禁止将本项目用于任何商业用途或违法行为
 - **责任声明**：因使用本项目产生的任何法律纠纷或损失，均由使用者自行承担
 - **争议处理**：如果官方音乐平台觉得本项目不妥，请通过 Issues 联系
+
+## Star History
+
+<a href="https://www.star-history.com/?repos=Linsxyx%2FKugouMusic.NET&type=timeline&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=Linsxyx/KugouMusic.NET&type=timeline&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=Linsxyx/KugouMusic.NET&type=timeline&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=Linsxyx/KugouMusic.NET&type=timeline&legend=top-left" />
+ </picture>
+</a>
