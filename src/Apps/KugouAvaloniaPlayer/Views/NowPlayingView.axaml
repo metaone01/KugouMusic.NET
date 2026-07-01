@@ -141,10 +141,12 @@
             <Panel x:Name="SharedBackgroundFrame"
                    HorizontalAlignment="Left"
                    VerticalAlignment="Top"
+                   ClipToBounds="False"
                    IsHitTestVisible="False">
                 <Image Source="{Binding NowPlayingBackgroundImageSource, Converter={StaticResource LocalCachedBitmapConverter}, ConverterParameter=1200}"
                        asyncImageLoader:ImageLoader.Source="{Binding NowPlayingBackgroundImageSource, Converter={StaticResource RemoteImageSourceConverter}}"
                        Stretch="UniformToFill"
+                       Margin="-96"
                        Opacity="{Binding BackgroundImageOpacity}"
                        Classes="NowPlayingBackgroundLayer">
                     <Image.Effect>
@@ -153,10 +155,12 @@
                 </Image>
                 <Image asyncImageLoader:ImageLoader.Source="{Binding PortraitBackgroundA}"
                        Stretch="UniformToFill"
+                       Margin="-96"
                        Opacity="{Binding PortraitLayerAOpacity}"
                        Classes="NowPlayingBackgroundLayer" />
                 <Image asyncImageLoader:ImageLoader.Source="{Binding PortraitBackgroundB}"
                        Stretch="UniformToFill"
+                       Margin="-96"
                        Opacity="{Binding PortraitLayerBOpacity}"
                        Classes="NowPlayingBackgroundLayer" />
             </Panel>

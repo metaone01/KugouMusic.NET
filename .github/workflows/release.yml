@@ -48,6 +48,7 @@ jobs:
             -r ${{ matrix.rid }} \
             --self-contained true \
             -p:DebugType=None \
+            -p:PublishAot=true 
             -p:DebugSymbols=false \
             -o ./publish
 
@@ -170,6 +171,7 @@ jobs:
             -r "$RID" \
             --self-contained true \
             -p:DebugType=None \
+            -p:PublishAot=true \
             -p:DebugSymbols=false \
             -o ./publish/macos
 
