@@ -259,7 +259,7 @@ unsafe extern "system" fn taskbar_toolbar_wnd_proc(
     let toolbar = unsafe { &mut *(toolbar_handle.0 as *mut KgTaskbarToolbar) };
 
     if msg == toolbar.taskbar_button_created_message {
-        if !toolbar.buttons_added && add_buttons(toolbar).is_ok() {
+        if add_buttons(toolbar).is_ok() {
             toolbar.buttons_added = true;
         }
     } else if msg == WM_COMMAND {
