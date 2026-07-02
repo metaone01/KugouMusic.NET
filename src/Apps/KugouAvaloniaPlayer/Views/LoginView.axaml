@@ -91,7 +91,7 @@
                             <Button Classes="Basic"
                                     Command="{Binding #Root.((vm:LoginViewModel)DataContext).SelectLoginAccountCommand}"
                                     CommandParameter="{Binding}"
-                                    IsEnabled="{Binding #Root.((vm:LoginViewModel)DataContext).IsLoggingIn}"
+                                    IsEnabled="{Binding !#Root.((vm:LoginViewModel)DataContext).IsLoggingIn}"
                                     HorizontalAlignment="Stretch"
                                     HorizontalContentAlignment="Stretch"
                                     Margin="0,0,0,8"
