@@ -25,6 +25,7 @@ public partial class PlayerViewModel : ViewModelBase, IDisposable
 {
     private const int MaxConsecutiveFailures = 5;
     private const float VolumeStep = 0.05f;
+    private static readonly string[] PlaybackSpeedOptionLabels = ["0.5x", "0.75x", "1x", "1.25x", "1.5x", "2x"];
     private const double AnalysisWindowSec = 15.0;
     private const double FallbackMixDurationSec = 6.8;
     private const double FallbackMixEntrySec = 4.6;
@@ -112,6 +113,9 @@ public partial class PlayerViewModel : ViewModelBase, IDisposable
     public partial string MusicQuality { get; set; } = AudioQuality.Default;
 
     [ObservableProperty]
+    public partial float PlaybackSpeed { get; set; } = 1.0f;
+
+    [ObservableProperty]
     public partial double NowPlayingArtworkOpacity { get; set; } = 1;
 
     [ObservableProperty]
@@ -138,12 +142,15 @@ public partial class PlayerViewModel : ViewModelBase, IDisposable
     private PreparedTrack? _preparedNextTrack;
     private string? _prepareFailureSongKey;
     [ObservableProperty]
+    public partial string PlaybackSpeedSelection { get; set; } = "1x";
+    [ObservableProperty]
     public partial string QualitySelection { get; set; } = AudioQuality.Default;
 
     [ObservableProperty]
     public partial double TotalDurationSeconds { get; set; }
 
     private CancellationTokenSource? _transitionWorkCancellation;
+    private bool _isSyncingPlaybackSpeedSelection;
 
     public PlayerViewModel(
         ISukiToastManager toastManager, ILogger<PlayerViewModel> logger,
@@ -173,10 +180,12 @@ public partial class PlayerViewModel : ViewModelBase, IDisposable
         _player = playbackCoordinator.Player;
         _player.PlaybackEnded += OnPlaybackEnded;
         MusicQuality = SettingsManager.Settings.MusicQuality;
+        PlaybackSpeed = Math.Clamp(SettingsManager.Settings.PlaybackSpeed, 0.5f, 2.0f);
         IsSeamlessTransitionEnabled = SettingsManager.Settings.EnableSeamlessTransition;
         IsNowPlayingVisualizerEnabled = SettingsManager.Settings.EnableNowPlayingVisualizer;
         MusicVolume = Math.Clamp(SettingsManager.Settings.MusicVolume, 0f, 1f);
         QualitySelection = MusicQuality;
+        PlaybackSpeedSelection = FormatPlaybackSpeedSelection(PlaybackSpeed);
         UpdateAudioEffects(SettingsManager.Settings.EQPreset, SettingsManager.Settings.EnableSurround);
         _audioEffectsService.Initialize(SettingsManager.Settings.EnableVolumeNormalization);
 
@@ -213,6 +222,7 @@ public partial class PlayerViewModel : ViewModelBase, IDisposable
         remove => _visualizerService.Updated -= value;
     }
     public string[] QualityOptions { get; } = AudioQuality.Ordered.AsValueEnumerable().ToArray();
+    public string[] PlaybackSpeedOptions { get; } = PlaybackSpeedOptionLabels;
     public int DisplayPlaybackQueueCount => DisplayPlaybackQueue.Count;
     public bool HasDisplayPlaybackQueue => DisplayPlaybackQueue.Count > 0;
     public TimeSpan CurrentPosition => TimeSpan.FromSeconds(CurrentPositionSeconds);

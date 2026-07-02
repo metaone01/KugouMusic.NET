@@ -16,6 +16,7 @@ public partial class SimpleAudioPlayer
         public int HighShelfHandle { get; set; }
         public int LowPassHandle { get; set; }
         public int PeakEqHandle { get; set; }
+        public float PlaybackSpeed { get; set; } = 1.0f;
         public float[] RealtimeFftBuffer { get; } = new float[1024];
         public float[] RealtimeSpectrumBands { get; } = new float[RealtimeSpectrumBandCount];
         public float TransitionGain { get; set; } = 1.0f;

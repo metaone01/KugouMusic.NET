@@ -137,6 +137,7 @@ public static class SettingsManager
             : Settings.CustomBackgroundImagePath;
         Settings.CustomBackgroundImageOpacity = Math.Clamp(Settings.CustomBackgroundImageOpacity, 0.1, 1.0);
         Settings.MusicVolume = Math.Clamp(Settings.MusicVolume, 0f, 1f);
+        Settings.PlaybackSpeed = Math.Clamp(Settings.PlaybackSpeed, 0.5f, 2.0f);
         if (!SimpleAudioPlayer.IsOutputDeviceAvailable(Settings.AudioOutputDeviceId))
             Settings.AudioOutputDeviceId = AppSettings.SystemDefaultAudioOutputDeviceId;
         Settings.CustomEqGains = NormalizeCustomEqGains(Settings.CustomEqGains);

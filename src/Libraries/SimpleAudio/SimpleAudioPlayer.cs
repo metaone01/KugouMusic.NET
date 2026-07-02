@@ -77,6 +77,12 @@ public partial class SimpleAudioPlayer
         set => _state.PeakEqHandle = value;
     }
 
+    private float PlaybackSpeed
+    {
+        get => _state.PlaybackSpeed;
+        set => _state.PlaybackSpeed = value;
+    }
+
     private float TransitionGain
     {
         get => _state.TransitionGain;

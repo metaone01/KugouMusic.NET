@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Controls.Notifications;
@@ -93,6 +94,18 @@ public partial class PlayerViewModel
         SettingsManager.Save();
     }
 
+    partial void OnPlaybackSpeedChanged(float value)
+    {
+        var normalized = Math.Clamp(value, 0.5f, 2.0f);
+        _player.SetPlaybackSpeed(normalized);
+        SettingsManager.Settings.PlaybackSpeed = normalized;
+        SettingsManager.Save();
+
+        var selection = FormatPlaybackSpeedSelection(normalized);
+        if (!string.Equals(PlaybackSpeedSelection, selection, StringComparison.Ordinal))
+            SetPlaybackSpeedSelectionSilently(selection);
+    }
+
     partial void OnDisplayedPlayingSongChanged(SongItem? value)
     {
         BeginNowPlayingSongTransition();
@@ -133,6 +146,29 @@ public partial class PlayerViewModel
         _ = SwitchQualityAsync(value);
     }
 
+    partial void OnPlaybackSpeedSelectionChanged(string value)
+    {
+        if (_isSyncingPlaybackSpeedSelection)
+            return;
+
+        if (!TryParsePlaybackSpeedSelection(value, out var speed))
+            return;
+
+        if (Math.Abs(PlaybackSpeed - speed) < 0.001f)
+            return;
+
+        PlaybackSpeed = speed;
+    }
+
+    [RelayCommand]
+    private void SetPlaybackSpeedOption(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return;
+
+        PlaybackSpeedSelection = value;
+    }
+
     private void SetQualitySelectionSilently(string value)
     {
         if (string.Equals(QualitySelection, value, StringComparison.OrdinalIgnoreCase))
@@ -152,6 +188,44 @@ public partial class PlayerViewModel
     private void RevertQualitySelectionToCurrentQuality()
     {
         SetQualitySelectionSilently(MusicQuality);
+    }
+
+    private void SetPlaybackSpeedSelectionSilently(string value)
+    {
+        if (string.Equals(PlaybackSpeedSelection, value, StringComparison.Ordinal))
+            return;
+
+        _isSyncingPlaybackSpeedSelection = true;
+        try
+        {
+            PlaybackSpeedSelection = value;
+        }
+        finally
+        {
+            _isSyncingPlaybackSpeedSelection = false;
+        }
+    }
+
+    private static string FormatPlaybackSpeedSelection(float speed)
+    {
+        var normalized = Math.Clamp(speed, 0.5f, 2.0f);
+        if (Math.Abs(normalized - MathF.Round(normalized)) < 0.001f)
+            return MathF.Round(normalized).ToString("0", CultureInfo.InvariantCulture) + "x";
+
+        return normalized.ToString("0.##", CultureInfo.InvariantCulture) + "x";
+    }
+
+    private static bool TryParsePlaybackSpeedSelection(string? value, out float speed)
+    {
+        speed = 1.0f;
+        if (string.IsNullOrWhiteSpace(value))
+            return false;
+
+        var normalized = value.Trim();
+        if (normalized.EndsWith("x", StringComparison.OrdinalIgnoreCase))
+            normalized = normalized[..^1];
+
+        return float.TryParse(normalized, NumberStyles.Float, CultureInfo.InvariantCulture, out speed);
     }
 
     public async Task LoadLikeListAsync()

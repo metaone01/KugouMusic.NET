@@ -257,6 +257,48 @@
                     <!-- 分隔感 -->
                     <Border Width="1" Height="20" Opacity="0.12" Background="Gray" Margin="4,0" />
 
+                    <Button Cursor="Hand"
+                            Classes="Basic"
+                            ToolTip.Tip="播放倍速"
+                            VerticalAlignment="Center"
+                            Padding="8,0"
+                            MinWidth="68"
+                            Height="32">
+                        <Button.Flyout>
+                            <MenuFlyout>
+                                <MenuItem Header="0.5x"
+                                          Command="{Binding Player.SetPlaybackSpeedOptionCommand}"
+                                          CommandParameter="0.5x" />
+                                <MenuItem Header="0.75x"
+                                          Command="{Binding Player.SetPlaybackSpeedOptionCommand}"
+                                          CommandParameter="0.75x" />
+                                <MenuItem Header="1x"
+                                          Command="{Binding Player.SetPlaybackSpeedOptionCommand}"
+                                          CommandParameter="1x" />
+                                <MenuItem Header="1.25x"
+                                          Command="{Binding Player.SetPlaybackSpeedOptionCommand}"
+                                          CommandParameter="1.25x" />
+                                <MenuItem Header="1.5x"
+                                          Command="{Binding Player.SetPlaybackSpeedOptionCommand}"
+                                          CommandParameter="1.5x" />
+                                <MenuItem Header="2x"
+                                          Command="{Binding Player.SetPlaybackSpeedOptionCommand}"
+                                          CommandParameter="2x" />
+                            </MenuFlyout>
+                        </Button.Flyout>
+                        <StackPanel Orientation="Horizontal"
+                                    Spacing="4"
+                                    VerticalAlignment="Center">
+                            <Svg Classes="ThemeSvgIcon"
+                                 Path="/Assets/speed-svgrepo-com.svg"
+                                 Width="16"
+                                 Height="16" />
+                            <TextBlock Text="{Binding Player.PlaybackSpeedSelection}"
+                                       FontSize="11"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    
                     <ComboBox Classes="QualityCombo"
                               ItemsSource="{Binding Player.QualityOptions}"
                               SelectedItem="{Binding Player.QualitySelection}"
@@ -275,7 +317,7 @@
                             </DataTemplate>
                         </ComboBox.SelectionBoxItemTemplate>
                     </ComboBox>
-
+                    
                     <!-- 队列按钮 -->
                     <Button x:Name="QueueButton"
                             Cursor="Hand"

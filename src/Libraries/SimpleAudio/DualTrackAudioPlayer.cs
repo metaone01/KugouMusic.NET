@@ -21,6 +21,7 @@ public sealed class DualTrackAudioPlayer : IDisposable
     private float _currentReverbAmount;
     private float _currentReverbTimeMs = 1500f;
     private float _currentStereoWidth;
+    private float _playbackSpeed = 1.0f;
     private float _deckANormalizationGain = 1.0f;
     private float _deckBNormalizationGain = 1.0f;
     private bool _surroundEnabled;
@@ -153,6 +154,19 @@ public sealed class DualTrackAudioPlayer : IDisposable
     public float GetVolume()
     {
         return _activeDeck.GetVolume();
+    }
+
+    public void SetPlaybackSpeed(float speed)
+    {
+        _playbackSpeed = Math.Clamp(speed, 0.5f, 2.0f);
+        _activeDeck.SetPlaybackSpeed(_playbackSpeed);
+        _standbyDeck.SetPlaybackSpeed(_playbackSpeed);
+        _fadingDeck?.SetPlaybackSpeed(_playbackSpeed);
+    }
+
+    public float GetPlaybackSpeed()
+    {
+        return _playbackSpeed;
     }
 
     public void SetVolumeNormalizationEnabled(bool enabled)
@@ -354,6 +368,7 @@ public sealed class DualTrackAudioPlayer : IDisposable
         deck.SetStereoWidth(_currentStereoWidth);
         deck.SetReverbAmount(_currentReverbAmount);
         deck.SetReverbTime(_currentReverbTimeMs);
+        deck.SetPlaybackSpeed(_playbackSpeed);
         deck.SetVolume(_userVolume);
         deck.SetNormalizationGain(GetEffectiveNormalizationGain(deck));
         deck.SetTransitionGain(1f);

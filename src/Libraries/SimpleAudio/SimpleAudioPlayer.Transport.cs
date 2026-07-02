@@ -1,4 +1,5 @@
 using ManagedBass;
+using ManagedBass.Fx;
 
 namespace SimpleAudio;
 
@@ -9,6 +10,8 @@ public partial class SimpleAudioPlayer : IDisposable
         Stop();
 
         var flags = BassFlags.Default | BassFlags.Float;
+        var sourceFlags = flags | BassFlags.Decode;
+        var sourceStream = 0;
         lock (BassDeviceGate)
         {
             if (!TryInitializeOutputDevice(_preferredOutputDeviceId, out _))
@@ -22,11 +25,16 @@ public partial class SimpleAudioPlayer : IDisposable
 
             if (url.StartsWith("http", StringComparison.OrdinalIgnoreCase))
             {
-                Stream = Bass.CreateStream(url, 0, flags, null, IntPtr.Zero);
+                sourceStream = Bass.CreateStream(url, 0, sourceFlags, null, IntPtr.Zero);
             }
             else if (File.Exists(url))
             {
-                Stream = Bass.CreateStream(url, 0, 0, flags);
+                sourceStream = Bass.CreateStream(url, 0, 0, sourceFlags);
+            }
+
+            if (sourceStream != 0)
+            {
+                Stream = BassFx.TempoCreate(sourceStream, flags | BassFlags.FxFreeSource);
             }
         }
 
@@ -53,6 +61,7 @@ public partial class SimpleAudioPlayer : IDisposable
         ApplyEQ();
         ApplySpatialEffects();
         ApplyTransitionTone();
+        ApplyPlaybackSpeed();
         UpdateActualVolume();
 
         return true;
@@ -171,6 +180,17 @@ public partial class SimpleAudioPlayer : IDisposable
         UpdateActualVolume();
     }
 
+    public void SetPlaybackSpeed(float speed)
+    {
+        PlaybackSpeed = Math.Clamp(speed, 0.5f, 2.0f);
+        ApplyPlaybackSpeed();
+    }
+
+    public float GetPlaybackSpeed()
+    {
+        return PlaybackSpeed;
+    }
+
     public void SetPosition(TimeSpan time)
     {
         if (Stream == 0)
@@ -235,6 +255,17 @@ public partial class SimpleAudioPlayer : IDisposable
                                Math.Clamp(TransitionGain, 0f, 1.25f);
             Bass.ChannelSetAttribute(Stream, ChannelAttribute.Volume, Math.Clamp(actualVolume, 0f, 1f));
         }
+    }
+
+    private void ApplyPlaybackSpeed()
+    {
+        if (Stream == 0)
+        {
+            return;
+        }
+
+        var tempoPercent = (PlaybackSpeed - 1.0f) * 100.0f;
+        Bass.ChannelSetAttribute(Stream, ChannelAttribute.Tempo, tempoPercent);
     }
 
     private void EndSync(int handle, int channel, int data, IntPtr user)

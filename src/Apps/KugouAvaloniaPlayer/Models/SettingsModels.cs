@@ -178,6 +178,8 @@ public class AppSettings
 
     public float MusicVolume { get; set; } = 0.8f;
 
+    public float PlaybackSpeed { get; set; } = 1.0f;
+
     public float[] CustomEqGains { get; set; } = new float[CustomEqBandCount];
 
     public bool DesktopLyricUseCustomMainColor { get; set; }
