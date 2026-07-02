@@ -31,6 +31,7 @@ public partial class MyPlaylistsViewModel : PageViewModelBase, IDisposable
     private readonly ICreatePlaylistDialogService _createPlaylistDialogService;
     private readonly IExternalPlaylistImportService _externalPlaylistImportService;
     private readonly FavoritePlaylistService _favoritePlaylistService;
+    private readonly UserCreatedPlaylistCacheService _userCreatedPlaylistCacheService;
     private readonly ILogger<MyPlaylistsViewModel> _logger;
     private readonly AlbumClient _albumClient;
     private readonly PlaylistClient _playlistClient;
@@ -64,6 +65,7 @@ public partial class MyPlaylistsViewModel : PageViewModelBase, IDisposable
         PlaylistClient playlistClient,
         AlbumClient albumClient,
         FavoritePlaylistService favoritePlaylistService,
+        UserCreatedPlaylistCacheService userCreatedPlaylistCacheService,
         ISukiToastManager toastManager,
         ICreatePlaylistDialogService createPlaylistDialogService,
         IExternalPlaylistImportService externalPlaylistImportService,
@@ -73,6 +75,7 @@ public partial class MyPlaylistsViewModel : PageViewModelBase, IDisposable
         _playlistClient = playlistClient;
         _albumClient = albumClient;
         _favoritePlaylistService = favoritePlaylistService;
+        _userCreatedPlaylistCacheService = userCreatedPlaylistCacheService;
         _toastManager = toastManager;
         _createPlaylistDialogService = createPlaylistDialogService;
         _externalPlaylistImportService = externalPlaylistImportService;
@@ -125,7 +128,10 @@ public partial class MyPlaylistsViewModel : PageViewModelBase, IDisposable
         Items.Clear();
 
         if (!_userClient.IsLoggedIn())
+        {
+            _userCreatedPlaylistCacheService.Clear();
             return;
+        }
 
         var onlinePlaylists = await LoadAllOnlinePlaylistsAsync();
         if (_isDisposed)
@@ -133,8 +139,13 @@ public partial class MyPlaylistsViewModel : PageViewModelBase, IDisposable
 
         if (onlinePlaylists is not null && onlinePlaylists.Status == 1)
         {
+            var orderedPlaylists = UserPlaylistDisplayHelper.OrderForDisplay(onlinePlaylists.Playlists).AsValueEnumerable().ToArray();
+            _userCreatedPlaylistCacheService.Update(orderedPlaylists.AsValueEnumerable()
+                .Where(item => !string.IsNullOrEmpty(item.ListCreateId) && item.Type == 0)
+                .ToArray());
+
             var onlineItems = new List<PlaylistItem>();
-            foreach (var item in OrderUserPlaylistsForDisplay(onlinePlaylists.Playlists))
+            foreach (var item in orderedPlaylists)
                 if (!string.IsNullOrEmpty(item.ListCreateId) || item.IsCollectedAlbum)
                     onlineItems.Add(new PlaylistItem
                     {
@@ -162,14 +173,6 @@ public partial class MyPlaylistsViewModel : PageViewModelBase, IDisposable
                 _logger.LogInformation("歌单列表远端失败，已从本地缓存兜底显示“我喜欢”。 source={Source}", cachedLike.Source);
             }
         }
-    }
-
-    private static IEnumerable<UserPlaylistItem> OrderUserPlaylistsForDisplay(List<UserPlaylistItem> playlists)
-    {
-        if (playlists.Count <= 2)
-            return playlists;
-
-        return playlists.AsValueEnumerable().Take(2).Concat(playlists.AsValueEnumerable().Skip(2).Reverse()).ToArray();
     }
 
     private async Task<UserPlaylistResponse?> LoadAllOnlinePlaylistsAsync()

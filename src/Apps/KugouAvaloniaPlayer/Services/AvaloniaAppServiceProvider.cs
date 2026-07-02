@@ -74,6 +74,7 @@ public sealed partial class AvaloniaAppServiceProvider
         .Bind<ISingerViewModelFactory>().To<SingerViewModelFactory>()
         .Bind<IDiscoverTagViewModelFactory>().To<DiscoverTagViewModelFactory>()
         .Bind<IDesktopLyricViewModelFactory>().As(Singleton).To<DesktopLyricViewModelFactory>()
+        .Bind<UserCreatedPlaylistCacheService>().As(Singleton).To<UserCreatedPlaylistCacheService>()
 
         .Bind<PlaybackQueueManager>().As(Singleton).To<PlaybackQueueManager>()
         .Bind<PlaybackQueueCacheService>().As(Singleton).To<PlaybackQueueCacheService>()

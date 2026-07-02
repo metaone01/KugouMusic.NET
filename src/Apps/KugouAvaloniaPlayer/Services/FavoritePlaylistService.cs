@@ -25,6 +25,7 @@ public partial class FavoritePlaylistService(
     UserClient userClient,
     PlaylistClient playlistClient,
     KgSessionManager sessionManager,
+    UserCreatedPlaylistCacheService userCreatedPlaylistCacheService,
     ISukiToastManager toastManager,
     ISukiDialogManager dialogManager,
     IUiDispatcherService uiDispatcher,
@@ -34,6 +35,7 @@ public partial class FavoritePlaylistService(
     private const int CacheSchemaVersion = 2;
     private const string StoreScope = "favorite_like_cache";
     private const int AddToPlaylistDialogPageSize = 100;
+    private const int MaxUserPlaylistPages = 200;
     private static readonly TimeSpan LoadPlaylistDialogTimeout = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan AddSongToPlaylistTimeout = TimeSpan.FromSeconds(12);
     private readonly Dictionary<string, int> _hashToFileId = new();
@@ -262,25 +264,31 @@ public partial class FavoritePlaylistService(
             return;
         }
 
-        ShowProgressDialog("加载歌单", "正在获取你的歌单列表...");
-
         try
         {
-            var playlists = await WaitWithTimeoutAsync(
-                userClient.GetPlaylistsAsync(1, AddToPlaylistDialogPageSize),
-                LoadPlaylistDialogTimeout,
-                "加载歌单超时，请检查网络后重试。");
-
-            DismissDialog();
-
-            if (playlists is null || playlists.Status != 1)
+            var onlinePlaylists = userCreatedPlaylistCacheService.GetSnapshot();
+            if (onlinePlaylists.Count == 0)
             {
-                logger.LogError("获取歌单列表失败 err_code{ErrorCode}", playlists?.ErrorCode);
-                ShowToast(NotificationType.Error, "加载失败", "歌单列表获取失败，请稍后再试。");
-                return;
+                ShowProgressDialog("加载歌单", "正在获取你的歌单列表...");
+
+                var playlists = await WaitWithTimeoutAsync(
+                    LoadAllCreatedPlaylistsAsync(),
+                    LoadPlaylistDialogTimeout,
+                    "加载歌单超时，请检查网络后重试。");
+
+                DismissDialog();
+
+                if (playlists is null)
+                {
+                    logger.LogError("获取歌单列表失败");
+                    ShowToast(NotificationType.Error, "加载失败", "歌单列表获取失败，请稍后再试。");
+                    return;
+                }
+
+                onlinePlaylists = playlists;
+                userCreatedPlaylistCacheService.Update(onlinePlaylists);
             }
 
-            var onlinePlaylists = playlists.Playlists.AsValueEnumerable().Where(p => !string.IsNullOrEmpty(p.ListCreateId) && p.Type == 0).ToList();
             if (onlinePlaylists.Count == 0)
             {
                 ShowToast(NotificationType.Warning, "提示", "请先创建歌单");
@@ -292,8 +300,6 @@ public partial class FavoritePlaylistService(
                 song.Singer,
                 song.Cover,
                 onlinePlaylists.AsValueEnumerable().Select(AddToPlaylistDialogViewModel.ToPlaylistDialogItem).ToArray(),
-                userClient.GetPlaylistsAsync,
-                playlists.ListCount > playlists.Playlists.Count,
                 async selectedPlaylist =>
                 {
                     DismissDialog();
@@ -324,6 +330,41 @@ public partial class FavoritePlaylistService(
         {
             _addToPlaylistDialogLock.Release();
         }
+    }
+
+    private async Task<IReadOnlyList<UserPlaylistItem>?> LoadAllCreatedPlaylistsAsync()
+    {
+        var allPlaylists = new List<UserPlaylistItem>();
+
+        for (var page = 1; page <= MaxUserPlaylistPages; page++)
+        {
+            var response = await userClient.GetPlaylistsAsync(page, AddToPlaylistDialogPageSize);
+            if (response is null)
+                return null;
+
+            if (response.Status != 1)
+            {
+                logger.LogError("获取歌单列表失败 err_code={ErrorCode}, page={Page}", response.ErrorCode, page);
+                return null;
+            }
+
+            if (response.Playlists.Count == 0)
+                break;
+
+            allPlaylists.AddRange(response.Playlists.AsValueEnumerable()
+                .Where(p => !string.IsNullOrEmpty(p.ListCreateId) && p.Type == 0)
+                .ToArray());
+
+            if (response.ListCount > 0 && allPlaylists.Count >= response.ListCount)
+                break;
+
+            if (response.Playlists.Count < AddToPlaylistDialogPageSize)
+                break;
+        }
+
+        return UserPlaylistDisplayHelper.OrderForDisplay(allPlaylists).AsValueEnumerable()
+            .Where(item => !string.IsNullOrEmpty(item.ListCreateId) && item.Type == 0)
+            .ToArray();
     }
 
     private void UpsertSongInCache(SongItem song)

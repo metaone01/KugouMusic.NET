@@ -129,9 +129,7 @@
                     <ListBox Classes="PlaylistPickerList"
                              MaxHeight="360"
                              SelectionMode="Single"
-                             ItemsSource="{Binding FilteredPlaylists}"
-                             behaviors:InteractionBehaviors.ScrollNearBottomCommand="{Binding LoadMorePlaylistsCommand}"
-                             behaviors:InteractionBehaviors.ScrollNearBottomThreshold="120">
+                             ItemsSource="{Binding FilteredPlaylists}">
                         <ListBox.ItemsPanel>
                             <ItemsPanelTemplate>
                                 <VirtualizingStackPanel />
@@ -201,20 +199,6 @@
                         </ListBox.ItemTemplate>
                     </ListBox>
 
-                    <Border Padding="12,8"
-                            CornerRadius="999"
-                            HorizontalAlignment="Center"
-                            VerticalAlignment="Bottom"
-                            Background="{DynamicResource SukiBackground}"
-                            IsVisible="{Binding IsLoadingMorePlaylists}">
-                        <StackPanel Orientation="Horizontal"
-                                    Spacing="8">
-                            <suki:Loading Width="14"
-                                          Height="14" />
-                            <TextBlock Text="正在加载更多歌单..."
-                                       Foreground="{DynamicResource SukiLowText}" />
-                        </StackPanel>
-                    </Border>
                 </Grid>
             </Grid>
 
