@@ -2,6 +2,7 @@ using System;
 using System.Collections.ObjectModel;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using ZLinq;
 using System.Reflection;
 using System.Threading.Tasks;
@@ -382,6 +383,18 @@ public partial class SettingViewModel : PageViewModelBase
     private void OpenRepository()
     {
         OpenUrl(RepositoryUrl);
+    }
+
+    [RelayCommand]
+    private void OpenLogFolder()
+    {
+        var logDirectory = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "kugou",
+            "logs");
+
+        Directory.CreateDirectory(logDirectory);
+        OpenPath(logDirectory);
     }
 
     [RelayCommand]
@@ -1233,11 +1246,16 @@ public partial class SettingViewModel : PageViewModelBase
 
     private static void OpenUrl(string url)
     {
+        OpenPath(url);
+    }
+
+    private static void OpenPath(string path)
+    {
         try
         {
             using var process = Process.Start(new ProcessStartInfo
             {
-                FileName = url,
+                FileName = path,
                 UseShellExecute = true
             });
         }

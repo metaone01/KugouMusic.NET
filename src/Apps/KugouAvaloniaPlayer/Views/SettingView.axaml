@@ -848,6 +848,24 @@
                                 </Button>
                             </Grid>
 
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" Margin="0,6">
+                                <StackPanel>
+                                    <TextBlock Text="日志文件夹" FontWeight="DemiBold" />
+                                    <TextBlock Text="快速打开应用日志目录"
+                                               FontSize="12"
+                                               Foreground="{DynamicResource SukiLowText}" />
+                                </StackPanel>
+                                <Button Grid.Column="1"
+                                        Classes="Basic"
+                                        Command="{Binding OpenLogFolderCommand}"
+                                        MinWidth="120">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <Svg Classes="ThemeSvgIcon" Path="/Assets/open-log-folder.svg" Width="16" Height="16" />
+                                        <TextBlock Text="打开日志" />
+                                    </StackPanel>
+                                </Button>
+                            </Grid>
+
                             <Border Height="1" Background="{DynamicResource SukiBorder}" Margin="0,2" />
 
                             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" Margin="0,4">
