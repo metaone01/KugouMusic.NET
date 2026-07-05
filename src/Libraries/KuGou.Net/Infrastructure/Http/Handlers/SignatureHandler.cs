@@ -52,9 +52,9 @@ public class KgSignatureHandler(KgSessionManager sessionManager) : DelegatingHan
         }
 
         var jsonBody = "";
-        if (request.Method == HttpMethod.Post && kgReq.Body != null && kgReq.Body.Count > 0)
+        if (request.Method == HttpMethod.Post && kgReq.Body != null)
         {
-            jsonBody = JsonSerializer.Serialize(kgReq.Body, AppJsonContext.Default.JsonObject);
+            jsonBody = RequestBodyJsonSerializer.Serialize(kgReq.Body, kgReq.BodyTypeInfo);
 
             request.Content = new StringContent(jsonBody, Encoding.UTF8, kgReq.ContentType);
         }

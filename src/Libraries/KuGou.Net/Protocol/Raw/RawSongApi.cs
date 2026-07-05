@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using KuGou.Net.Abstractions;
 using KuGou.Net.Infrastructure.Http;
 using KuGou.Net.Protocol.Session;
@@ -15,25 +16,16 @@ public class RawSongApi(IKgTransport transport, KgSessionManager sessionManager)
     {
         var session = sessionManager.Session;
         var clientTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-        var data = SplitComma(hash, s => new JsonObject
-        {
-            ["hash"] = s,
-            ["audio_id"] = 0
-        });
-
-        var body = new JsonObject
-        {
-            ["appid"] = KuGouConfig.AppId,
-            ["clienttime"] = clientTime,
-            ["clientver"] = KuGouConfig.ClientVer,
-            ["data"] = data,
-            ["dfid"] = string.IsNullOrWhiteSpace(session.Dfid) ? "-" : session.Dfid,
-            ["key"] = KgSigner.CalcLoginKey(clientTime),
-            ["mid"] = string.IsNullOrWhiteSpace(session.Mid) ? KgUtils.CalcNewMid(session.Dfid) : session.Mid
-        };
-
-        if (!string.IsNullOrWhiteSpace(session.Token)) body["token"] = session.Token;
-        if (!string.IsNullOrWhiteSpace(session.UserId) && session.UserId != "0") body["userid"] = session.UserId;
+        var body = new AudioLookupRequestBody(
+            KuGouConfig.AppId,
+            clientTime,
+            KuGouConfig.ClientVer,
+            SplitComma(hash, s => new AudioLookupRequestItem(s, 0)),
+            string.IsNullOrWhiteSpace(session.Dfid) ? "-" : session.Dfid,
+            KgSigner.CalcLoginKey(clientTime),
+            string.IsNullOrWhiteSpace(session.Mid) ? KgUtils.CalcNewMid(session.Dfid) : session.Mid,
+            string.IsNullOrWhiteSpace(session.Token) ? null : session.Token,
+            string.IsNullOrWhiteSpace(session.UserId) || session.UserId == "0" ? null : session.UserId);
 
         return transport.SendAsync(new KgRequest
         {
@@ -41,6 +33,7 @@ public class RawSongApi(IKgTransport transport, KgSessionManager sessionManager)
             BaseUrl = "http://kmr.service.kugou.com",
             Path = "/v1/audio/audio",
             Body = body,
+            BodyTypeInfo = RawSongApiJsonContext.Default.AudioLookupRequestBody,
             SpecificRouter = "kmr.service.kugou.com",
             SignatureType = SignatureType.Default
         });
@@ -189,15 +182,16 @@ public class RawSongApi(IKgTransport transport, KgSessionManager sessionManager)
 
     public Task<JsonElement> GetKmrAudioMvAsync(string albumAudioIds, string? fields = null)
     {
+        var body = new KmrAudioMvRequestBody(
+            SplitComma(albumAudioIds, s => new AlbumAudioIdRequestItem(s)),
+            fields ?? string.Empty);
+
         return transport.SendAsync(new KgRequest
         {
             Method = HttpMethod.Post,
             Path = "/kmr/v1/audio/mv",
-            Body = new JsonObject
-            {
-                ["data"] = SplitComma(albumAudioIds, s => new JsonObject { ["album_audio_id"] = s }),
-                ["fields"] = fields ?? string.Empty
-            },
+            Body = body,
+            BodyTypeInfo = RawSongApiJsonContext.Default.KmrAudioMvRequestBody,
             SpecificRouter = "openapi.kugou.com",
             CustomHeaders = new Dictionary<string, string> { ["KG-TID"] = "38" },
             SignatureType = SignatureType.Default
@@ -206,18 +200,16 @@ public class RawSongApi(IKgTransport transport, KgSessionManager sessionManager)
 
     public Task<JsonElement> GetKmrAudioAsync(string albumAudioIds, string? fields = "base")
     {
+        var body = new KmrAudioRequestBody(
+            SplitComma(albumAudioIds, s => new EntityIdRequestItem(long.TryParse(s, out var id) ? id : 0)),
+            fields ?? "base");
+
         return transport.SendAsync(new KgRequest
         {
             Method = HttpMethod.Post,
             Path = "/kmr/v2/audio",
-            Body = new JsonObject
-            {
-                ["data"] = SplitComma(albumAudioIds, s => new JsonObject
-                {
-                    ["entity_id"] = long.TryParse(s, out var id) ? id : 0
-                }),
-                ["fields"] = fields ?? "base"
-            },
+            Body = body,
+            BodyTypeInfo = RawSongApiJsonContext.Default.KmrAudioRequestBody,
             SpecificRouter = "openapi.kugou.com",
             CustomHeaders = new Dictionary<string, string> { ["KG-TID"] = "238" },
             SignatureType = SignatureType.Default
@@ -226,7 +218,9 @@ public class RawSongApi(IKgTransport transport, KgSessionManager sessionManager)
 
     public Task<JsonElement> GetSongClimaxAsync(string hash)
     {
-        var data = SplitComma(hash, s => new JsonObject { ["hash"] = s });
+        var data = JsonSerializer.Serialize(
+            SplitComma(hash, s => new HashOnlyRequestItem(s)),
+            RawSongApiJsonContext.Default.ListHashOnlyRequestItem);
 
         return transport.SendAsync(new KgRequest
         {
@@ -235,7 +229,7 @@ public class RawSongApi(IKgTransport transport, KgSessionManager sessionManager)
             Path = "/v1/audio_climax/audio",
             Params = new Dictionary<string, string>
             {
-                ["data"] = data.ToJsonString()
+                ["data"] = data
             },
             SignatureType = SignatureType.Default
         });
@@ -273,37 +267,35 @@ public class RawSongApi(IKgTransport transport, KgSessionManager sessionManager)
         var hashes = hash.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         var albums = (albumIds ?? string.Empty)
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        var resource = new JsonArray();
+        var resource = new List<PrivilegeLiteResourceItem>(hashes.Length);
 
         for (var i = 0; i < hashes.Length; i++)
         {
-            resource.Add(new JsonObject
-            {
-                ["type"] = "audio",
-                ["page_id"] = 0,
-                ["hash"] = hashes[i],
-                ["album_id"] = i < albums.Length ? albums[i] : "0"
-            });
+            resource.Add(new PrivilegeLiteResourceItem(
+                "audio",
+                0,
+                hashes[i],
+                i < albums.Length ? albums[i] : "0"));
         }
+
+        var body = new PrivilegeLiteRequestBody(
+            KuGouConfig.AppId,
+            1,
+            "play",
+            KuGouConfig.ClientVer,
+            1,
+            1,
+            1,
+            resource,
+            [AudioQuality.Standard, AudioQuality.High, AudioQuality.Lossless,
+                AudioQuality.HiRes, "viper_atmos", "viper_tape", "viper_clear", "super", "multitrack"]);
 
         return transport.SendAsync(new KgRequest
         {
             Method = HttpMethod.Post,
             Path = "/v2/get_res_privilege/lite",
-            Body = new JsonObject
-            {
-                ["appid"] = KuGouConfig.AppId,
-                ["area_code"] = 1,
-                ["behavior"] = "play",
-                ["clientver"] = KuGouConfig.ClientVer,
-                ["need_hash_offset"] = 1,
-                ["relate"] = 1,
-                ["support_verify"] = 1,
-                ["resource"] = resource,
-                ["qualities"] = new JsonArray(AudioQuality.Standard, AudioQuality.High, AudioQuality.Lossless,
-                    AudioQuality.HiRes, "viper_atmos", "viper_tape",
-                    "viper_clear", "super", "multitrack")
-            },
+            Body = body,
+            BodyTypeInfo = RawSongApiJsonContext.Default.PrivilegeLiteRequestBody,
             SpecificRouter = "media.store.kugou.com",
             SignatureType = SignatureType.Default
         });
@@ -312,7 +304,9 @@ public class RawSongApi(IKgTransport transport, KgSessionManager sessionManager)
     public Task<JsonElement> GetImagesAsync(string hash, string? albumIds = null, string? albumAudioIds = null,
         int count = 5)
     {
-        var data = BuildImageResource(hash, albumIds, albumAudioIds);
+        var data = JsonSerializer.Serialize(
+            BuildImageResource(hash, albumIds, albumAudioIds),
+            RawSongApiJsonContext.Default.ListImageResourceRequestItem);
         var parameters = new Dictionary<string, string>
         {
             ["album_image_type"] = "-3",
@@ -320,7 +314,7 @@ public class RawSongApi(IKgTransport transport, KgSessionManager sessionManager)
             ["clientver"] = KuGouConfig.ClientVer,
             ["author_image_type"] = "3,4,5",
             ["count"] = count.ToString(),
-            ["data"] = data.ToJsonString(),
+            ["data"] = data,
             ["isCdn"] = "1",
             ["publish_time"] = "1"
         };
@@ -341,13 +335,15 @@ public class RawSongApi(IKgTransport transport, KgSessionManager sessionManager)
     public Task<JsonElement> GetAudioImagesAsync(string hash, string? audioIds = null, string? albumAudioIds = null,
         string? fileNames = null, int count = 5)
     {
-        var data = BuildAudioImageResource(hash, audioIds, albumAudioIds, fileNames);
+        var data = JsonSerializer.Serialize(
+            BuildAudioImageResource(hash, audioIds, albumAudioIds, fileNames),
+            RawSongApiJsonContext.Default.ListAudioImageResourceRequestItem);
         var parameters = new Dictionary<string, string>
         {
             ["appid"] = KuGouConfig.AppId,
             ["clientver"] = KuGouConfig.ClientVer,
             ["count"] = count.ToString(),
-            ["data"] = data.ToJsonString(),
+            ["data"] = data,
             ["isCdn"] = "1",
             ["publish_time"] = "1",
             ["show_authors"] = "1"
@@ -482,12 +478,12 @@ public class RawSongApi(IKgTransport transport, KgSessionManager sessionManager)
         });
     }
 
-    private static JsonArray SplitComma(string value, Func<string, JsonObject> factory)
+    private static List<T> SplitComma<T>(string value, Func<string, T> factory)
     {
-        var array = new JsonArray();
+        var items = new List<T>();
         foreach (var item in value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-            array.Add(factory(item));
-        return array;
+            items.Add(factory(item));
+        return items;
     }
 
     private static string CalcJoinedSignature(Dictionary<string, string> parameters, string salt, string separator)
@@ -507,41 +503,37 @@ public class RawSongApi(IKgTransport transport, KgSessionManager sessionManager)
         return KgUtils.Md5($"{KuGouConfig.LiteSalt}{BuildSortedParamString(parameters, string.Empty)}{KuGouConfig.LiteSalt}");
     }
 
-    private static JsonArray BuildImageResource(string hash, string? albumIds, string? albumAudioIds)
+    private static List<ImageResourceRequestItem> BuildImageResource(string hash, string? albumIds, string? albumAudioIds)
     {
         var hashes = SplitValues(hash);
         var albums = SplitValues(albumIds);
         var albumAudios = SplitValues(albumAudioIds);
-        var data = new JsonArray();
+        var data = new List<ImageResourceRequestItem>(hashes.Length);
 
         for (var i = 0; i < hashes.Length; i++)
-            data.Add(new JsonObject
-            {
-                ["album_id"] = i < albums.Length ? albums[i] : "0",
-                ["hash"] = hashes[i],
-                ["album_audio_id"] = i < albumAudios.Length ? albumAudios[i] : "0"
-            });
+            data.Add(new ImageResourceRequestItem(
+                i < albums.Length ? albums[i] : "0",
+                hashes[i],
+                i < albumAudios.Length ? albumAudios[i] : "0"));
 
         return data;
     }
 
-    private static JsonArray BuildAudioImageResource(string hash, string? audioIds, string? albumAudioIds,
+    private static List<AudioImageResourceRequestItem> BuildAudioImageResource(string hash, string? audioIds, string? albumAudioIds,
         string? fileNames)
     {
         var hashes = SplitValues(hash);
         var audios = SplitValues(audioIds);
         var albumAudios = SplitValues(albumAudioIds);
         var names = SplitValues(fileNames);
-        var data = new JsonArray();
+        var data = new List<AudioImageResourceRequestItem>(hashes.Length);
 
         for (var i = 0; i < hashes.Length; i++)
-            data.Add(new JsonObject
-            {
-                ["audio_id"] = i < audios.Length ? audios[i] : "0",
-                ["hash"] = hashes[i],
-                ["album_audio_id"] = i < albumAudios.Length ? albumAudios[i] : "0",
-                ["filename"] = i < names.Length ? names[i] : string.Empty
-            });
+            data.Add(new AudioImageResourceRequestItem(
+                i < audios.Length ? audios[i] : "0",
+                hashes[i],
+                i < albumAudios.Length ? albumAudios[i] : "0",
+                i < names.Length ? names[i] : string.Empty));
 
         return data;
     }
@@ -550,4 +542,75 @@ public class RawSongApi(IKgTransport transport, KgSessionManager sessionManager)
     {
         return (value ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
     }
+}
+
+internal sealed record AudioLookupRequestItem(
+    [property: JsonPropertyName("hash")] string Hash,
+    [property: JsonPropertyName("audio_id")] int AudioId);
+
+internal sealed record AudioLookupRequestBody(
+    [property: JsonPropertyName("appid")] string AppId,
+    [property: JsonPropertyName("clienttime")] long ClientTime,
+    [property: JsonPropertyName("clientver")] string ClientVer,
+    [property: JsonPropertyName("data")] List<AudioLookupRequestItem> Data,
+    [property: JsonPropertyName("dfid")] string Dfid,
+    [property: JsonPropertyName("key")] string Key,
+    [property: JsonPropertyName("mid")] string Mid,
+    [property: JsonPropertyName("token")] string? Token,
+    [property: JsonPropertyName("userid")] string? UserId);
+
+internal sealed record AlbumAudioIdRequestItem(
+    [property: JsonPropertyName("album_audio_id")] string AlbumAudioId);
+
+internal sealed record KmrAudioMvRequestBody(
+    [property: JsonPropertyName("data")] List<AlbumAudioIdRequestItem> Data,
+    [property: JsonPropertyName("fields")] string Fields);
+
+internal sealed record EntityIdRequestItem(
+    [property: JsonPropertyName("entity_id")] long EntityId);
+
+internal sealed record KmrAudioRequestBody(
+    [property: JsonPropertyName("data")] List<EntityIdRequestItem> Data,
+    [property: JsonPropertyName("fields")] string Fields);
+
+internal sealed record HashOnlyRequestItem(
+    [property: JsonPropertyName("hash")] string Hash);
+
+internal sealed record PrivilegeLiteResourceItem(
+    [property: JsonPropertyName("type")] string Type,
+    [property: JsonPropertyName("page_id")] int PageId,
+    [property: JsonPropertyName("hash")] string Hash,
+    [property: JsonPropertyName("album_id")] string AlbumId);
+
+internal sealed record PrivilegeLiteRequestBody(
+    [property: JsonPropertyName("appid")] string AppId,
+    [property: JsonPropertyName("area_code")] int AreaCode,
+    [property: JsonPropertyName("behavior")] string Behavior,
+    [property: JsonPropertyName("clientver")] string ClientVer,
+    [property: JsonPropertyName("need_hash_offset")] int NeedHashOffset,
+    [property: JsonPropertyName("relate")] int Relate,
+    [property: JsonPropertyName("support_verify")] int SupportVerify,
+    [property: JsonPropertyName("resource")] List<PrivilegeLiteResourceItem> Resource,
+    [property: JsonPropertyName("qualities")] List<string> Qualities);
+
+internal sealed record ImageResourceRequestItem(
+    [property: JsonPropertyName("album_id")] string AlbumId,
+    [property: JsonPropertyName("hash")] string Hash,
+    [property: JsonPropertyName("album_audio_id")] string AlbumAudioId);
+
+internal sealed record AudioImageResourceRequestItem(
+    [property: JsonPropertyName("audio_id")] string AudioId,
+    [property: JsonPropertyName("hash")] string Hash,
+    [property: JsonPropertyName("album_audio_id")] string AlbumAudioId,
+    [property: JsonPropertyName("filename")] string FileName);
+
+[JsonSerializable(typeof(AudioLookupRequestBody))]
+[JsonSerializable(typeof(KmrAudioMvRequestBody))]
+[JsonSerializable(typeof(KmrAudioRequestBody))]
+[JsonSerializable(typeof(PrivilegeLiteRequestBody))]
+[JsonSerializable(typeof(List<HashOnlyRequestItem>))]
+[JsonSerializable(typeof(List<ImageResourceRequestItem>))]
+[JsonSerializable(typeof(List<AudioImageResourceRequestItem>))]
+internal partial class RawSongApiJsonContext : JsonSerializerContext
+{
 }

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using KuGou.Net.Infrastructure.Http;
 using KuGou.Net.Protocol.Session;
 using KuGou.Net.Protocol.Transport;
@@ -32,28 +33,25 @@ public class RawFmApi(IKgTransport transport, KgSessionManager sessionManager)
     public Task<JsonElement> GetSongsAsync(string fmIds, int type = 2, int offset = -1, int size = 20)
     {
         var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-        var data = new JsonArray();
-        foreach (var id in fmIds.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-            data.Add(new JsonObject
-            {
-                ["fmid"] = id,
-                ["fmtype"] = type,
-                ["offset"] = offset,
-                ["size"] = size,
-                ["singername"] = ""
-            });
+        var body = new FmSongsRequestBody(
+            1,
+            fmIds.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(id => new FmSongRequestItem(id, type, offset, size, string.Empty))
+                .ToList(),
+            1,
+            sessionManager.Session.UserId,
+            KuGouConfig.AppId,
+            now,
+            KuGouConfig.ClientVer,
+            KgSigner.CalcLoginKey(now),
+            KgUtils.CalcNewMid(sessionManager.Session.Dfid));
 
         return transport.SendAsync(new KgRequest
         {
             Method = HttpMethod.Post,
             Path = "/v1/app_song_list_offset",
-            Body = SignedBody(now, new JsonObject
-            {
-                ["area_code"] = 1,
-                ["data"] = data,
-                ["get_tracker"] = 1,
-                ["uid"] = sessionManager.Session.UserId
-            }),
+            Body = body,
+            BodyTypeInfo = RawFmApiJsonContext.Default.FmSongsRequestBody,
             SpecificRouter = "fm.service.kugou.com",
             SignatureType = SignatureType.Default
         });
@@ -83,24 +81,23 @@ public class RawFmApi(IKgTransport transport, KgSessionManager sessionManager)
     public Task<JsonElement> GetImagesAsync(string fmIds)
     {
         var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-        var data = new JsonArray();
-        foreach (var id in fmIds.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-            data.Add(new JsonObject
-            {
-                ["fields"] = "imgUrl100,imgUrl50",
-                ["fmid"] = id,
-                ["fmtype"] = 2
-            });
+        var body = new FmImagesRequestBody(
+            fmIds.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(id => new FmImageRequestItem("imgUrl100,imgUrl50", id, 2))
+                .ToList(),
+            sessionManager.Session.Dfid,
+            KuGouConfig.AppId,
+            now,
+            KuGouConfig.ClientVer,
+            KgSigner.CalcLoginKey(now),
+            KgUtils.CalcNewMid(sessionManager.Session.Dfid));
 
         return transport.SendAsync(new KgRequest
         {
             Method = HttpMethod.Post,
             Path = "/v1/fm_info",
-            Body = SignedBody(now, new JsonObject
-            {
-                ["data"] = data,
-                ["dfid"] = sessionManager.Session.Dfid
-            }),
+            Body = body,
+            BodyTypeInfo = RawFmApiJsonContext.Default.FmImagesRequestBody,
             SpecificRouter = "fm.service.kugou.com",
             SignatureType = SignatureType.Default
         });
@@ -115,4 +112,42 @@ public class RawFmApi(IKgTransport transport, KgSessionManager sessionManager)
         body["mid"] = KgUtils.CalcNewMid(sessionManager.Session.Dfid);
         return body;
     }
+}
+
+internal sealed record FmSongRequestItem(
+    [property: JsonPropertyName("fmid")] string FmId,
+    [property: JsonPropertyName("fmtype")] int FmType,
+    [property: JsonPropertyName("offset")] int Offset,
+    [property: JsonPropertyName("size")] int Size,
+    [property: JsonPropertyName("singername")] string SingerName);
+
+internal sealed record FmSongsRequestBody(
+    [property: JsonPropertyName("area_code")] int AreaCode,
+    [property: JsonPropertyName("data")] List<FmSongRequestItem> Data,
+    [property: JsonPropertyName("get_tracker")] int GetTracker,
+    [property: JsonPropertyName("uid")] string? UserId,
+    [property: JsonPropertyName("appid")] string AppId,
+    [property: JsonPropertyName("clienttime")] long ClientTime,
+    [property: JsonPropertyName("clientver")] string ClientVer,
+    [property: JsonPropertyName("key")] string Key,
+    [property: JsonPropertyName("mid")] string Mid);
+
+internal sealed record FmImageRequestItem(
+    [property: JsonPropertyName("fields")] string Fields,
+    [property: JsonPropertyName("fmid")] string FmId,
+    [property: JsonPropertyName("fmtype")] int FmType);
+
+internal sealed record FmImagesRequestBody(
+    [property: JsonPropertyName("data")] List<FmImageRequestItem> Data,
+    [property: JsonPropertyName("dfid")] string Dfid,
+    [property: JsonPropertyName("appid")] string AppId,
+    [property: JsonPropertyName("clienttime")] long ClientTime,
+    [property: JsonPropertyName("clientver")] string ClientVer,
+    [property: JsonPropertyName("key")] string Key,
+    [property: JsonPropertyName("mid")] string Mid);
+
+[JsonSerializable(typeof(FmSongsRequestBody))]
+[JsonSerializable(typeof(FmImagesRequestBody))]
+internal partial class RawFmApiJsonContext : JsonSerializerContext
+{
 }

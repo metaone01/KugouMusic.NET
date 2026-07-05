@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using KuGou.Net.Infrastructure.Http;
 using KuGou.Net.Protocol.Transport;
 using KuGou.Net.util;
@@ -148,28 +149,25 @@ public class RawPlaylistApi(IKgTransport transport, ILogger<RawPlaylistApi> logg
     public Task<JsonElement> GetSimilarPlaylistsAsync(string ids, string userid)
     {
         var clientTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-        var data = new JsonArray();
-        foreach (var id in ids.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-            data.Add(new JsonObject { ["global_collection_id"] = id });
-
-        var body = new JsonObject
-        {
-            ["appid"] = KuGouConfig.AppId,
-            ["clientver"] = KuGouConfig.ClientVer,
-            ["clienttime"] = clientTime,
-            ["key"] = KgSigner.CalcLoginKey(clientTime),
-            ["userid"] = userid,
-            ["ugc"] = 1,
-            ["show_list"] = 1,
-            ["need_songs"] = 1,
-            ["data"] = data
-        };
+        var body = new SimilarPlaylistsRequestBody(
+            KuGouConfig.AppId,
+            KuGouConfig.ClientVer,
+            clientTime,
+            KgSigner.CalcLoginKey(clientTime),
+            userid,
+            1,
+            1,
+            1,
+            ids.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(id => new PlaylistCollectionIdItem(id))
+                .ToList());
 
         return transport.SendAsync(new KgRequest
         {
             Method = HttpMethod.Post,
             Path = "/pubsongs/v1/kmr_get_similar_lists",
             Body = body,
+            BodyTypeInfo = RawPlaylistApiJsonContext.Default.SimilarPlaylistsRequestBody,
             SignatureType = SignatureType.Default
         });
     }
@@ -471,4 +469,23 @@ public class RawPlaylistApi(IKgTransport transport, ILogger<RawPlaylistApi> logg
 
         return await transport.SendAsync(request);
     }
+}
+
+internal sealed record PlaylistCollectionIdItem(
+    [property: JsonPropertyName("global_collection_id")] string GlobalCollectionId);
+
+internal sealed record SimilarPlaylistsRequestBody(
+    [property: JsonPropertyName("appid")] string AppId,
+    [property: JsonPropertyName("clientver")] string ClientVer,
+    [property: JsonPropertyName("clienttime")] long ClientTime,
+    [property: JsonPropertyName("key")] string Key,
+    [property: JsonPropertyName("userid")] string UserId,
+    [property: JsonPropertyName("ugc")] int Ugc,
+    [property: JsonPropertyName("show_list")] int ShowList,
+    [property: JsonPropertyName("need_songs")] int NeedSongs,
+    [property: JsonPropertyName("data")] List<PlaylistCollectionIdItem> Data);
+
+[JsonSerializable(typeof(SimilarPlaylistsRequestBody))]
+internal partial class RawPlaylistApiJsonContext : JsonSerializerContext
+{
 }

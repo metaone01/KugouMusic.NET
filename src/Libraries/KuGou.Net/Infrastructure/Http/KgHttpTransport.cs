@@ -47,10 +47,7 @@ public class KgHttpTransport(HttpClient client) : IKgTransport
             }
             else if (request.Body != null)
             {
-                var jsonBody = JsonSerializer.Serialize(
-                    request.Body,
-                    AppJsonContext.Default.JsonObject
-                );
+                var jsonBody = RequestBodyJsonSerializer.Serialize(request.Body, request.BodyTypeInfo);
                 msg.Content = new StringContent(jsonBody, Encoding.UTF8, "application/json");
             }
         }

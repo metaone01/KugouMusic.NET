@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using KuGou.Net.Infrastructure.Http;
 using KuGou.Net.Protocol.Session;
 using KuGou.Net.Protocol.Transport;
@@ -13,27 +14,26 @@ public class RawMediaCatalogApi(IKgTransport transport, KgSessionManager session
     {
         var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         var session = sessionManager.Session;
-        var data = new JsonArray();
-        foreach (var id in ids.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-            data.Add(new JsonObject { ["video_id"] = id });
+        var body = new VideoDetailRequestBody(
+            KuGouConfig.AppId,
+            KuGouConfig.ClientVer,
+            now,
+            KgUtils.CalcNewMid(session.Dfid),
+            KgUtils.Md5($"{session.Dfid}{KgUtils.CalcNewMid(session.Dfid)}"),
+            session.Dfid,
+            session.Token,
+            KgSigner.CalcLoginKey(now),
+            1,
+            ids.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(id => new VideoIdRequestItem(id))
+                .ToList());
 
         return transport.SendAsync(new KgRequest
         {
             Method = HttpMethod.Post,
             Path = "/v1/video",
-            Body = new JsonObject
-            {
-                ["appid"] = KuGouConfig.AppId,
-                ["clientver"] = KuGouConfig.ClientVer,
-                ["clienttime"] = now,
-                ["mid"] = KgUtils.CalcNewMid(session.Dfid),
-                ["uuid"] = KgUtils.Md5($"{session.Dfid}{KgUtils.CalcNewMid(session.Dfid)}"),
-                ["dfid"] = session.Dfid,
-                ["token"] = session.Token,
-                ["key"] = KgSigner.CalcLoginKey(now),
-                ["show_resolution"] = 1,
-                ["data"] = data
-            },
+            Body = body,
+            BodyTypeInfo = RawMediaCatalogApiJsonContext.Default.VideoDetailRequestBody,
             ClearDefaultParams = true,
             SpecificRouter = "kmr.service.kugou.com",
             SignatureType = SignatureType.Default
@@ -42,21 +42,19 @@ public class RawMediaCatalogApi(IKgTransport transport, KgSessionManager session
 
     public Task<JsonElement> GetLongAudioAlbumDetailAsync(string albumIds)
     {
-        var data = new JsonArray();
-        foreach (var id in albumIds.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-            data.Add(new JsonObject { ["album_id"] = id });
+        var body = new LongAudioAlbumDetailRequestBody(
+            albumIds.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(id => new MediaCatalogAlbumIdRequestItem(id))
+                .ToList(),
+            1,
+            "album_name,album_id,category,authors,sizable_cover,intro,author_name,trans_param,album_tag,mix_intro,full_intro,is_publish");
 
         return transport.SendAsync(new KgRequest
         {
             Method = HttpMethod.Post,
             Path = "/openapi/v2/broadcast",
-            Body = new JsonObject
-            {
-                ["data"] = data,
-                ["show_album_tag"] = 1,
-                ["fields"] =
-                    "album_name,album_id,category,authors,sizable_cover,intro,author_name,trans_param,album_tag,mix_intro,full_intro,is_publish"
-            },
+            Body = body,
+            BodyTypeInfo = RawMediaCatalogApiJsonContext.Default.LongAudioAlbumDetailRequestBody,
             CustomHeaders = new Dictionary<string, string> { ["kg-tid"] = "78" },
             SignatureType = SignatureType.Default
         });
@@ -159,19 +157,18 @@ public class RawMediaCatalogApi(IKgTransport transport, KgSessionManager session
 
     public Task<JsonElement> GetIpDetailAsync(string ids)
     {
-        var data = new JsonArray();
-        foreach (var id in ids.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-            data.Add(new JsonObject { ["ip_id"] = id });
+        var body = new IpDetailRequestBody(
+            ids.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(id => new IpIdRequestItem(id))
+                .ToList(),
+            1);
 
         return transport.SendAsync(new KgRequest
         {
             Method = HttpMethod.Post,
             Path = "/openapi/v1/ip",
-            Body = new JsonObject
-            {
-                ["data"] = data,
-                ["is_publish"] = 1
-            },
+            Body = body,
+            BodyTypeInfo = RawMediaCatalogApiJsonContext.Default.IpDetailRequestBody,
             SignatureType = SignatureType.Default
         });
     }
@@ -446,4 +443,41 @@ public class RawMediaCatalogApi(IKgTransport transport, KgSessionManager session
             SignatureType = SignatureType.Default
         });
     }
+}
+
+internal sealed record VideoIdRequestItem(
+    [property: JsonPropertyName("video_id")] string VideoId);
+
+internal sealed record VideoDetailRequestBody(
+    [property: JsonPropertyName("appid")] string AppId,
+    [property: JsonPropertyName("clientver")] string ClientVer,
+    [property: JsonPropertyName("clienttime")] long ClientTime,
+    [property: JsonPropertyName("mid")] string Mid,
+    [property: JsonPropertyName("uuid")] string Uuid,
+    [property: JsonPropertyName("dfid")] string Dfid,
+    [property: JsonPropertyName("token")] string? Token,
+    [property: JsonPropertyName("key")] string Key,
+    [property: JsonPropertyName("show_resolution")] int ShowResolution,
+    [property: JsonPropertyName("data")] List<VideoIdRequestItem> Data);
+
+internal sealed record MediaCatalogAlbumIdRequestItem(
+    [property: JsonPropertyName("album_id")] string AlbumId);
+
+internal sealed record LongAudioAlbumDetailRequestBody(
+    [property: JsonPropertyName("data")] List<MediaCatalogAlbumIdRequestItem> Data,
+    [property: JsonPropertyName("show_album_tag")] int ShowAlbumTag,
+    [property: JsonPropertyName("fields")] string Fields);
+
+internal sealed record IpIdRequestItem(
+    [property: JsonPropertyName("ip_id")] string IpId);
+
+internal sealed record IpDetailRequestBody(
+    [property: JsonPropertyName("data")] List<IpIdRequestItem> Data,
+    [property: JsonPropertyName("is_publish")] int IsPublish);
+
+[JsonSerializable(typeof(VideoDetailRequestBody))]
+[JsonSerializable(typeof(LongAudioAlbumDetailRequestBody))]
+[JsonSerializable(typeof(IpDetailRequestBody))]
+internal partial class RawMediaCatalogApiJsonContext : JsonSerializerContext
+{
 }

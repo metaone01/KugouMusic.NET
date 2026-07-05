@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using KuGou.Net.Infrastructure.Http;
 using KuGou.Net.Protocol.Transport;
 using KuGou.Net.util;
@@ -153,36 +154,35 @@ public class RawDiscoveryApi(IKgTransport transport)
         string? albumAudioIds = null)
     {
         var clientTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-        var recommendSource = new JsonArray();
+        var recommendSource = new List<AiRecommendSourceItem>();
 
         if (!string.IsNullOrWhiteSpace(albumAudioIds))
         {
             foreach (var id in albumAudioIds.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
                 if (long.TryParse(id, out var parsedId))
-                    recommendSource.Add(new JsonObject { ["ID"] = parsedId });
+                    recommendSource.Add(new AiRecommendSourceItem(parsedId));
         }
 
-        var body = new JsonObject
-        {
-            ["platform"] = "ios",
-            ["clientver"] = KuGouConfig.ClientVer,
-            ["clienttime"] = clientTime,
-            ["userid"] = userid,
-            ["client_playlist"] = new JsonArray(),
-            ["source_type"] = 2,
-            ["playlist_ver"] = 2,
-            ["area_code"] = 1,
-            ["appid"] = KuGouConfig.AppId,
-            ["key"] = KgSigner.CalcLoginKey(clientTime),
-            ["mid"] = string.IsNullOrWhiteSpace(mid) ? "-" : mid,
-            ["recommend_source"] = recommendSource
-        };
+        var body = new AiRecommendRequestBody(
+            "ios",
+            KuGouConfig.ClientVer,
+            clientTime,
+            userid,
+            [],
+            2,
+            2,
+            1,
+            KuGouConfig.AppId,
+            KgSigner.CalcLoginKey(clientTime),
+            string.IsNullOrWhiteSpace(mid) ? "-" : mid,
+            recommendSource);
 
         var request = new KgRequest
         {
             Method = HttpMethod.Post,
             Path = "/recommend",
             Body = body,
+            BodyTypeInfo = RawDiscoveryApiJsonContext.Default.AiRecommendRequestBody,
             SpecificRouter = "songlistairec.kugou.com",
             ClearDefaultParams = true,
             SignatureType = SignatureType.Default
@@ -418,7 +418,7 @@ public class RawDiscoveryApi(IKgTransport transport)
             if (int.TryParse(ipIdText, out var ipId)) item!["extra"]!["ip_id"] = ipId;
         }
 
-        return JsonSerializer.SerializeToElement(node);
+        return JsonSerializer.SerializeToElement(node, AppJsonContext.Default.JsonNode);
     }
     
     /// <summary>
@@ -594,4 +594,26 @@ public class RawDiscoveryApi(IKgTransport transport)
             SignatureType = SignatureType.Default
         });
     }
+}
+
+internal sealed record AiRecommendSourceItem(
+    [property: JsonPropertyName("ID")] long Id);
+
+internal sealed record AiRecommendRequestBody(
+    [property: JsonPropertyName("platform")] string Platform,
+    [property: JsonPropertyName("clientver")] string ClientVer,
+    [property: JsonPropertyName("clienttime")] long ClientTime,
+    [property: JsonPropertyName("userid")] string UserId,
+    [property: JsonPropertyName("client_playlist")] List<int> ClientPlaylist,
+    [property: JsonPropertyName("source_type")] int SourceType,
+    [property: JsonPropertyName("playlist_ver")] int PlaylistVer,
+    [property: JsonPropertyName("area_code")] int AreaCode,
+    [property: JsonPropertyName("appid")] string AppId,
+    [property: JsonPropertyName("key")] string Key,
+    [property: JsonPropertyName("mid")] string Mid,
+    [property: JsonPropertyName("recommend_source")] List<AiRecommendSourceItem> RecommendSource);
+
+[JsonSerializable(typeof(AiRecommendRequestBody))]
+internal partial class RawDiscoveryApiJsonContext : JsonSerializerContext
+{
 }

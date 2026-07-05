@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using KuGou.Net.Infrastructure.Http;
 using KuGou.Net.Protocol.Transport;
 using KuGou.Net.util;
@@ -283,15 +284,17 @@ public class RawUserApi(IKgTransport transport)
 
     public Task<JsonElement> GetYouthChannelDetailAsync(string globalCollectionIds)
     {
-        var data = new JsonArray();
-        foreach (var id in globalCollectionIds.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-            data.Add(new JsonObject { ["global_collection_id"] = id });
+        var body = new YouthChannelDetailRequestBody(
+            globalCollectionIds.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(id => new UserCollectionIdItem(id))
+                .ToList());
 
         return transport.SendAsync(new KgRequest
         {
             Method = HttpMethod.Post,
             Path = "/youth/api/channel/v1/channel_list_by_id",
-            Body = new JsonObject { ["data"] = data },
+            Body = body,
+            BodyTypeInfo = RawUserApiJsonContext.Default.YouthChannelDetailRequestBody,
             SignatureType = SignatureType.Default
         });
     }
@@ -629,4 +632,15 @@ public class RawUserApi(IKgTransport transport)
             SignatureType = SignatureType.Default
         });
     }
+}
+
+internal sealed record UserCollectionIdItem(
+    [property: JsonPropertyName("global_collection_id")] string GlobalCollectionId);
+
+internal sealed record YouthChannelDetailRequestBody(
+    [property: JsonPropertyName("data")] List<UserCollectionIdItem> Data);
+
+[JsonSerializable(typeof(YouthChannelDetailRequestBody))]
+internal partial class RawUserApiJsonContext : JsonSerializerContext
+{
 }

@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization.Metadata;
 
 namespace KuGou.Net.Protocol.Transport;
 
@@ -23,7 +24,9 @@ public class KgRequest
     public Dictionary<string, string> Params { get; set; } = new();
 
     // POST Body (如果是 GET 则忽略)
-    public JsonObject? Body { get; set; }
+    public object? Body { get; set; }
+
+    public JsonTypeInfo? BodyTypeInfo { get; set; }
 
     // 签名策略
     public SignatureType SignatureType { get; set; } = SignatureType.Default;
