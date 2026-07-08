@@ -12,7 +12,6 @@ using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
-using KuGou.Net.Clients;
 using KuGou.Net.Protocol.Session;
 using KugouAvaloniaPlayer.Models;
 using KugouAvaloniaPlayer.Services;
@@ -28,18 +27,16 @@ public partial class MainWindowViewModel : ObservableObject
     private static Bitmap? _sCachedCustomBackgroundBitmap;
     private static string? _sCachedCustomBackgroundPath;
 
-    private readonly LoginClient _authClient;
-    private readonly RegisterClient _registerClient;
     private readonly IAppUpdateService _appUpdateService;
     private readonly IDesktopLyricWindowService _desktopLyricWindowService;
     private readonly DailyRecommendViewModel _dailyRecommendViewModel;
     private readonly ILogger<MainWindowViewModel> _logger;
     private readonly ILoginDialogService _loginDialogService;
+    private readonly ILoginInitializationService _loginInitializationService;
     private readonly INavigationService _navigationService;
     private readonly SearchViewModel _searchViewModel;
     private readonly UserCloudViewModel _userCloudViewModel;
     private readonly KgSessionManager _sessionManager;
-    private readonly UserClient _userClient;
     private readonly SettingViewModel _settingViewModel;
 
     [ObservableProperty]
@@ -86,13 +83,11 @@ public partial class MainWindowViewModel : ObservableObject
         PlayerViewModel player,
         ISukiDialogManager dialogManager,
         KgSessionManager sessionManager,
-        LoginClient authClient,
-        UserClient userClient,
-        RegisterClient deviceClient,
         ISingerViewModelFactory singerViewModelFactory,
         IAppUpdateService appUpdateService,
         IDesktopLyricWindowService desktopLyricWindowService,
         ILoginDialogService loginDialogService,
+        ILoginInitializationService loginInitializationService,
         INavigationService navigationService,
         NowPlayingViewModel nowPlaying,
         LoginViewModel loginViewModel,
@@ -108,14 +103,12 @@ public partial class MainWindowViewModel : ObservableObject
     {
         DialogManager = dialogManager;
         _sessionManager = sessionManager;
-        _authClient = authClient;
         _dailyRecommendViewModel = dailyRecommendViewModel;
-        _userClient = userClient;
-        _registerClient = deviceClient;
         var singerViewModelFactory1 = singerViewModelFactory;
         _appUpdateService = appUpdateService;
         _desktopLyricWindowService = desktopLyricWindowService;
         _loginDialogService = loginDialogService;
+        _loginInitializationService = loginInitializationService;
         _navigationService = navigationService;
 
         LoginViewModel = loginViewModel;
@@ -419,104 +412,25 @@ public partial class MainWindowViewModel : ObservableObject
     // --- 登录相关 ---
     private async Task LoadLocalSessionOrLogin()
     {
-        try
-        {
-            var session = _sessionManager.Session;
-            if (!string.IsNullOrEmpty(session.Token))
-            {
-                IsLoggedIn = true;
-                await LoadUserInfo();
-                _logger.LogInformation("已加载本地用户: {session.UserId}" , session.UserId);
+        var result = await _loginInitializationService.InitializeLocalSessionAsync();
+        if (!result.IsLoggedIn)
+            return;
 
-                _ = Task.Run(async () =>
-                {
-                    try
-                    {
-                        await TryGetVip();
-                        await Player.LoadLikeListAsync();
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning(ex, "获取VIP或喜欢列表失败");
-                    }
-                });
-            }
-            else
-            {
-                _logger.LogInformation("未登录，以游客身份运行。");
-                _authClient.LogOutAsync();
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "登录初始化失败");
-            _authClient.LogOutAsync();
-        }
+        IsLoggedIn = true;
+        ApplyUserProfile(result.Profile);
+
+        if (result.UserProfileLoadFailed)
+            ShowLoadUserInfoFailedToast();
+
+        _ = InitializeVipAndLikesAsync("获取VIP或喜欢列表失败", LogLevel.Warning);
     }
 
     private async Task LoadUserInfo()
     {
-        try
-        {
-            var userInfo = await _userClient.GetUserInfoAsync();
-            if (userInfo != null)
-            {
-                UserName = userInfo.Name;
-                UserAvatar = string.IsNullOrWhiteSpace(userInfo.Pic) ? null : userInfo.Pic;
-                _settingViewModel.UserName = UserName;
-                _settingViewModel.UserAvatar = UserAvatar;
-                _settingViewModel.UserId = _sessionManager.Session.UserId;
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "加载用户信息失败");
-            ToastManager.CreateToast()
-                .OfType(NotificationType.Warning)
-                .WithTitle("加载用户失败")
-                .Dismiss().After(TimeSpan.FromSeconds(3))
-                .Dismiss().ByClicking()
-                .Queue();
-        }
-    }
-
-    private async Task TryGetVip()
-    {
-        var history = await _userClient.GetVipRecordAsync();
-        if (history is { Status: 1 })
-        {
-            var todayStr = DateTime.Now.ToString("yyyy-MM-dd");
-            var todayRecord = history.Items.AsValueEnumerable().FirstOrDefault(x => x.Day == todayStr);
-            switch (todayRecord)
-            {
-                case null:
-                {
-                    var data = await _userClient.ReceiveOneDayVipAsync();
-                    if (data is not null && data.Status == 1)
-                        _logger.LogInformation("vip领取成功");
-                    else
-                        _logger.LogError("vip领取失败{data.ErrorCode}" , data?.ErrorCode);
-                    await Task.Delay(1000);
-                    await _userClient.UpgradeVipRewardAsync();
-                    break;
-                }
-                case { VipType: "tvip" }:
-                    await _userClient.UpgradeVipRewardAsync();
-                    break;
-                default:
-                    _logger.LogInformation("今日已领取vip");
-                    break;
-            }
-        }else
-        {
-            _logger.LogWarning("查询vip失败{history.ErrorCode}" , history?.ErrorCode);
-            ToastManager.CreateToast()
-                .OfType(NotificationType.Warning)
-                .WithTitle($"查询vip失败,{history?.ErrorCode}")
-                .Dismiss().After(TimeSpan.FromSeconds(3))
-                .Dismiss().ByClicking()
-                .Queue();
-        }
+        var result = await _loginInitializationService.LoadCurrentUserProfileAsync();
+        ApplyUserProfile(result.Profile);
+        if (result.Failed)
+            ShowLoadUserInfoFailedToast();
     }
 
     private async Task OnLoginSuccessAsync()
@@ -533,20 +447,57 @@ public partial class MainWindowViewModel : ObservableObject
         if (ReferenceEquals(ActivePage, _userCloudViewModel))
             await _userCloudViewModel.LoadCloudCommand.ExecuteAsync(null);
 
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                await TryGetVip();
-                await Player.LoadLikeListAsync();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "初始化VIP或喜欢列表失败");
-            }
-        });
+        _ = InitializeVipAndLikesAsync("初始化VIP或喜欢列表失败", LogLevel.Error);
 
         await GetDailyRecommendations();
+    }
+
+    private async Task InitializeVipAndLikesAsync(string failureMessage, LogLevel logLevel)
+    {
+        try
+        {
+            var vipResult = await _loginInitializationService.TryReceiveStartupVipAsync();
+            if (!vipResult.Success)
+                ShowVipQueryFailedToast(vipResult.ErrorCode);
+
+            await Player.LoadLikeListAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.Log(logLevel, ex, failureMessage);
+        }
+    }
+
+    private void ApplyUserProfile(UserProfileSnapshot? profile)
+    {
+        if (profile == null)
+            return;
+
+        UserName = profile.UserName;
+        UserAvatar = profile.UserAvatar;
+        _settingViewModel.UserName = profile.UserName;
+        _settingViewModel.UserAvatar = profile.UserAvatar;
+        _settingViewModel.UserId = profile.UserId;
+    }
+
+    private void ShowLoadUserInfoFailedToast()
+    {
+        ToastManager.CreateToast()
+            .OfType(NotificationType.Warning)
+            .WithTitle("加载用户失败")
+            .Dismiss().After(TimeSpan.FromSeconds(3))
+            .Dismiss().ByClicking()
+            .Queue();
+    }
+
+    private void ShowVipQueryFailedToast(string? errorCode)
+    {
+        ToastManager.CreateToast()
+            .OfType(NotificationType.Warning)
+            .WithTitle($"查询vip失败,{errorCode}")
+            .Dismiss().After(TimeSpan.FromSeconds(3))
+            .Dismiss().ByClicking()
+            .Queue();
     }
 
     private void OnLogoutRequested()

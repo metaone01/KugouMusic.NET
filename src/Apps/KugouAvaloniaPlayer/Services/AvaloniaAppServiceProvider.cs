@@ -61,6 +61,7 @@ public sealed partial class AvaloniaAppServiceProvider
         .Bind<IExternalPlaylistParseStrategy>().As(Singleton).To<NeteasePlaylistParseStrategy>()
         .Bind<IExternalPlaylistParseStrategy>("QQ").As(Singleton).To<QqMusicPlaylistParseStrategy>()
         .Bind<IExternalPlaylistImportService>().As(Singleton).To<ExternalPlaylistImportService>()
+        .Bind<ILoginInitializationService>().As(Singleton).To<LoginInitializationService>()
         .Bind<ILoginDialogService>().As(Singleton).To<LoginDialogService>()
         .Bind<INavigationService>().As(Singleton).To<NavigationService>()
         .Bind<IMainWindowService>().As(Singleton).To<MainWindowService>()

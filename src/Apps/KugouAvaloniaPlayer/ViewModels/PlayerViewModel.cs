@@ -284,7 +284,7 @@ public partial class PlayerViewModel : ViewModelBase, IDisposable
                     .OfType(NotificationType.Error)
                     .WithTitle("熔断保护")
                     .Dismiss().After(TimeSpan.FromSeconds(3))
-                    .WithContent("连续多次失败，停止播放")
+                    .WithContent("连续多次失败，停止播放，建议重新登录")
                     .Queue();
                 _consecutiveFailures = 0;
                 return;
