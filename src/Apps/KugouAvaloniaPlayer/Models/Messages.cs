@@ -30,6 +30,8 @@ public record ShowMainWindowMessage;
 
 public record MainWindowChromeActionMessage(MainWindowChromeAction Action);
 
+public record LinuxWindowDecorationsChangedMessage(bool UseFullDecorations);
+
 public record PlaybackControlMessage(PlaybackControlAction Action);
 
 public record RefreshPlaylistsMessage;

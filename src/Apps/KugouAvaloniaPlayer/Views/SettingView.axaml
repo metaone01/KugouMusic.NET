@@ -216,6 +216,20 @@
                                     </ComboBox.ItemTemplate>
                                 </ComboBox>
                             </Grid>
+
+                            <Grid ColumnDefinitions="*,Auto"
+                                  ColumnSpacing="12"
+                                  Margin="0,6"
+                                  IsVisible="{Binding IsLinuxWindowDecorationToggleVisible}">
+                                <StackPanel>
+                                    <TextBlock Text="Linux 系统窗口标题栏" FontWeight="DemiBold" />
+                                    <TextBlock Text="开启后使用 Full 模式，显示系统标题栏以恢复窗口拖动与缩放兼容性"
+                                               FontSize="12"
+                                               Foreground="{DynamicResource SukiLowText}" />
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1"
+                                              IsChecked="{Binding LinuxUseFullWindowDecorations, Mode=TwoWay}" />
+                            </Grid>
                         </StackPanel>
                     </suki:GlassCard>
 

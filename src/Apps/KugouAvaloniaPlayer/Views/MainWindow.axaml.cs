@@ -31,6 +31,7 @@ public partial class MainWindow : SukiWindow
     public MainWindow()
     {
         InitializeComponent();
+        ApplyLinuxSystemWindowDecorationsFallback();
         RestoreWindowState();
 /*#if DEBUG
         RendererDiagnostics.DebugOverlays = RendererDebugOverlays.Fps
@@ -43,9 +44,30 @@ public partial class MainWindow : SukiWindow
             (_, message) => { ApplyChromeAction(message.Action); });
         WeakReferenceMessenger.Default.Register<ShowMainWindowMessage>(this,
             (_, _) => ShowAndActivateWindow());
+#if KUGOU_LINUX
+        WeakReferenceMessenger.Default.Register<LinuxWindowDecorationsChangedMessage>(this,
+            (_, message) => ApplyLinuxWindowDecorations(message.UseFullDecorations));
+#endif
     }
 
     public bool CanClose { get; set; }
+    
+    private void ApplyLinuxSystemWindowDecorationsFallback()
+    {
+#if KUGOU_LINUX
+        ApplyLinuxWindowDecorations(SettingsManager.Settings.LinuxUseFullWindowDecorations);
+#endif
+    }
+
+#if KUGOU_LINUX
+    private void ApplyLinuxWindowDecorations(bool useFullDecorations)
+    {
+        ExtendClientAreaToDecorationsHint = false;
+        WindowDecorations = useFullDecorations
+            ? WindowDecorations.Full
+            : WindowDecorations.BorderOnly;
+    }
+#endif
 
     protected override void OnClosing(WindowClosingEventArgs e)
     {

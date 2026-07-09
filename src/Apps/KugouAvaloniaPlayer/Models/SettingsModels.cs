@@ -158,6 +158,7 @@ public class AppSettings
     public Dictionary<string, JellyfinServerSettings> JellyfinServers { get; set; } = new();
     public string? LastJellyfinServerFingerprint { get; set; }
     public bool AutoCheckUpdate { get; set; } = true;
+    public bool LinuxUseFullWindowDecorations { get; set; }
     public bool UseCustomBackgroundImage { get; set; }
     public string? CustomBackgroundImagePath { get; set; }
     public double CustomBackgroundImageOpacity { get; set; } = 0.35;

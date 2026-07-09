@@ -59,6 +59,10 @@ public partial class SettingViewModel : PageViewModelBase
 
     [ObservableProperty]
     public partial bool AutoCheckUpdate { get; set; }
+#if KUGOU_LINUX
+    [ObservableProperty]
+    public partial bool LinuxUseFullWindowDecorations { get; set; }
+#endif
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CustomBackgroundImageStatus))]
     public partial bool UseCustomBackgroundImage { get; set; }
@@ -195,6 +199,9 @@ public partial class SettingViewModel : PageViewModelBase
         {
             SelectedCloseBehavior = SettingsManager.Settings.CloseBehavior;
             AutoCheckUpdate = SettingsManager.Settings.AutoCheckUpdate;
+#if KUGOU_LINUX
+            LinuxUseFullWindowDecorations = SettingsManager.Settings.LinuxUseFullWindowDecorations;
+#endif
             UseCustomBackgroundImage = SettingsManager.Settings.UseCustomBackgroundImage;
             CustomBackgroundImagePath = SettingsManager.Settings.CustomBackgroundImagePath;
             CustomBackgroundImageOpacity = Math.Clamp(SettingsManager.Settings.CustomBackgroundImageOpacity, 0.1, 1.0);
@@ -329,6 +336,12 @@ public partial class SettingViewModel : PageViewModelBase
             OnPropertyChanged();
         }
     }
+
+#if KUGOU_LINUX
+    public bool IsLinuxWindowDecorationToggleVisible => true;
+#else
+    public bool IsLinuxWindowDecorationToggleVisible => false;
+#endif
 
     public async Task LoadUserInfoAsync()
     {
@@ -481,6 +494,17 @@ public partial class SettingViewModel : PageViewModelBase
         SettingsManager.Settings.AutoCheckUpdate = value;
         SettingsManager.Save();
     }
+
+#if KUGOU_LINUX
+    partial void OnLinuxUseFullWindowDecorationsChanged(bool value)
+    {
+        if (_isApplyingSettingsSnapshot) return;
+
+        SettingsManager.Settings.LinuxUseFullWindowDecorations = value;
+        SettingsManager.Save();
+        WeakReferenceMessenger.Default.Send(new LinuxWindowDecorationsChangedMessage(value));
+    }
+#endif
 
     partial void OnUseCustomBackgroundImageChanged(bool value)
     {
