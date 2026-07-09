@@ -73,7 +73,7 @@ public class SearchClient(RawSearchApi rawApi, KgSessionManager sessionManager)
     public Task<JsonElement> SearchDefaultRawAsync()
     {
         var session = sessionManager.Session;
-        return rawApi.SearchDefaultAsync(session.UserId, session.VipType);
+        return rawApi.SearchDefaultAsync(session.UserId);
     }
 
     public Task<JsonElement> SearchSuggestRawAsync(string keyword, int albumTipCount = 10, int correctTipCount = 10,

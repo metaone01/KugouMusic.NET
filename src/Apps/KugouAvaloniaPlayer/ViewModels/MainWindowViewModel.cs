@@ -66,7 +66,6 @@ public partial class MainWindowViewModel : ObservableObject
     private bool _isUpdatingActivePageFromNavigation;
     private bool _isUpdatingSelectedMenuPageFromNavigation;
     private bool _isClosingDesktopLyricForShutdown;
-    
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SearchCommand))]
@@ -129,7 +128,6 @@ public partial class MainWindowViewModel : ObservableObject
         Pages.Add(historyViewModel);
         Pages.Add(localMusicLibraryViewModel);
         Pages.Add(discoverViewModel);
-        Pages.Add(_searchViewModel);
         Pages.Add(_userCloudViewModel);
         _navigationService.CurrentPageChanged += OnNavigationCurrentPageChanged;
         _navigationService.NavigateRoot(_dailyRecommendViewModel);
@@ -586,10 +584,10 @@ public partial class MainWindowViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanSearch))]
     private async Task Search()
     {
-        if (string.IsNullOrWhiteSpace(SearchKeyword)) return;
+        if (string.IsNullOrWhiteSpace(SearchKeyword))
+            return;
 
-        NavigateToPage(_searchViewModel);
-
+        _navigationService.NavigateTransient(_searchViewModel);
         await _searchViewModel.SearchAsync(SearchKeyword);
     }
 

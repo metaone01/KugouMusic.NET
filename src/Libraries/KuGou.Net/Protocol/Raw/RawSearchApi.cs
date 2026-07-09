@@ -98,14 +98,14 @@ public class RawSearchApi(IKgTransport transport)
         return await transport.SendAsync(request);
     }
 
-    public Task<JsonElement> SearchDefaultAsync(string userId = "0", string vipType = "65530")
+    public Task<JsonElement> SearchDefaultAsync(string userId = "0")
     {
         var body = new JsonObject
         {
             ["plat"] = 0,
             ["userid"] = long.TryParse(userId, out var uid) ? uid : 0,
             ["tags"] = "{}",
-            ["vip_type"] = vipType,
+            ["vip_type"] = 65530,
             ["m_type"] = 0,
             ["own_ads"] = new JsonObject(),
             ["ability"] = "3",

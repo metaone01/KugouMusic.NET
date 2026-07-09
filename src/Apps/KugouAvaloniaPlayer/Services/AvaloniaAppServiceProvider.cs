@@ -96,7 +96,7 @@ public sealed partial class AvaloniaAppServiceProvider
         .Bind<PlayerViewModel>().As(Singleton).To<PlayerViewModel>()
 
         .Bind<LoginViewModel>().To<LoginViewModel>()
-        .Bind<SearchViewModel>().To<SearchViewModel>()
+        .Bind<SearchViewModel>().As(Singleton).To<SearchViewModel>()
         .Bind<UserCloudViewModel>().To<UserCloudViewModel>()
         .Bind<SettingViewModel>().To<SettingViewModel>()
         .Bind<NowPlayingViewModel>().To<NowPlayingViewModel>()
@@ -107,7 +107,7 @@ public sealed partial class AvaloniaAppServiceProvider
         .Bind<LocalMusicLibraryViewModel>().To<LocalMusicLibraryViewModel>()
         .Bind<MyPlaylistsViewModel>().To<MyPlaylistsViewModel>()
         .Bind<EqSettingsViewModel>().To<EqSettingsViewModel>()
-        .Bind<RankViewModel>().To<RankViewModel>();
+        .Bind<RankViewModel>().As(Singleton).To<RankViewModel>();
 
     public TService GetService<TService>()
         where TService : class

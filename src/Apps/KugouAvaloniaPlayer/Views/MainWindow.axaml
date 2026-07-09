@@ -5,9 +5,8 @@
                  xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
                  xmlns:suki="https://github.com/kikipoulet/SukiUI"
                  xmlns:chrome="clr-namespace:Avalonia.Controls.Chrome;assembly=Avalonia.Controls"
-                 xmlns:asyncImageLoader="clr-namespace:AsyncImageLoader;assembly=AsyncImageLoader.Avalonia"
-                 xmlns:localControls="clr-namespace:KugouAvaloniaPlayer.Controls"
                  xmlns:views="clr-namespace:KugouAvaloniaPlayer.Views"
+                 xmlns:localControls="clr-namespace:KugouAvaloniaPlayer.Controls"
                  mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="700"
                  x:Class="KugouAvaloniaPlayer.Views.MainWindow"
                  MinHeight="600"
@@ -215,17 +214,35 @@
             <StackPanel Grid.Column="2"
                         Orientation="Horizontal"
                         Spacing="7"
-                        Margin="0,0,12,0"
+                        Margin="0,12,12,0"
                         VerticalAlignment="Center"
                         chrome:WindowDecorationProperties.ElementRole="User">
+                
+                <TextBox Text="{Binding SearchKeyword}"
+                         PlaceholderText="输入歌曲名、歌手名、歌单或专辑..."
+                         CornerRadius="15"
+                         Height="34"
+                         Width="260"
+                         FontSize="12"
+                         VerticalContentAlignment="Center">
+                    <TextBox.KeyBindings>
+                        <KeyBinding Gesture="Enter" Command="{Binding SearchCommand}" />
+                    </TextBox.KeyBindings>
+                    <TextBox.InnerLeftContent>
+                        <PathIcon Data="{x:Static suki:Icons.Search}"
+                                  Width="12"
+                                  Height="12"
+                                  Foreground="{DynamicResource SukiLowText}" />
+                    </TextBox.InnerLeftContent>
+                </TextBox>
                 <Button Classes="WindowControlsButton"
                         Command="{Binding NavigateToUserCommand}"
                         ToolTip.Tip="设置"
                         chrome:WindowDecorationProperties.ElementRole="User">
                     <Svg Classes="ThemeSvgIcon"
                          Path="/Assets/gear-svgrepo-com.svg"
-                         Width="12"
-                         Height="12"
+                         Width="18"
+                         Height="18"
                          VerticalAlignment="Center" />
                 </Button>
                 <Button Classes="WindowControlsButton"

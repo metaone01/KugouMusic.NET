@@ -9,6 +9,7 @@ using CommunityToolkit.Mvvm.Messaging;
 using KuGou.Net.Abstractions.Models;
 using KuGou.Net.Clients;
 using KugouAvaloniaPlayer.Models;
+using KugouAvaloniaPlayer.Services;
 using Microsoft.Extensions.Logging;
 using SukiUI.Toasts;
 
@@ -18,6 +19,7 @@ public partial class SearchViewModel(
     SearchClient searchClient,
     PlaylistClient playlistClient,
     AlbumClient albumClient,
+    INavigationService navigationService,
     ISukiToastManager toastManager,
     ILogger<SearchViewModel> logger) : PageViewModelBase
 {
@@ -52,9 +54,6 @@ public partial class SearchViewModel(
     public partial bool HasSearched { get; set; }
 
     [ObservableProperty]
-    public partial bool IsLoadingHot { get; set; }
-
-    [ObservableProperty]
     public partial bool IsLoadingMoreDetails { get; set; }
 
     [ObservableProperty]
@@ -64,12 +63,8 @@ public partial class SearchViewModel(
     public partial bool IsShowingDetail { get; set; }
 
     [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SearchCommand))]
     public partial string SearchKeyword { get; set; } = "";
-
-    [ObservableProperty]
-    public partial int SelectedHotMainIndex { get; set; }
-
-    private bool _suppressHotSelectionChanged;
 
     public override string DisplayName => "搜索";
     public override string Icon => "/Assets/Search.svg";
@@ -79,8 +74,6 @@ public partial class SearchViewModel(
     public AvaloniaList<SearchAlbumItem> Albums { get; } = new();
     public AvaloniaList<SearchAuthorItem> Singers { get; } = new();
     public AvaloniaList<SongItem> DetailSongs { get; } = new();
-    public AvaloniaList<SearchHotTagGroup> HotCategories { get; } = new();
-    public AvaloniaList<SearchHotTagItem> CurrentHotKeywords { get; } = new();
 
     // 当前是否显示歌单详情（用于控制收藏按钮可见性）
     public bool IsPlaylistDetail => _currentDetailType == DetailType.Playlist;
@@ -126,92 +119,6 @@ public partial class SearchViewModel(
         {
             IsSearching = false;
         }
-    }
-
-    [RelayCommand]
-    private async Task LoadSearchHot()
-    {
-        if (IsLoadingHot) return;
-        if (HotCategories.Count > 0) return;
-
-        IsLoadingHot = true;
-        try
-        {
-            var response = await searchClient.GetSearchHotAsync();
-            HotCategories.Clear();
-            CurrentHotKeywords.Clear();
-
-            if (response?.Categories == null || response.Categories.Count == 0)
-                return;
-
-            var groups = response.Categories
-                .AsValueEnumerable().Select((category, groupIndex) => new SearchHotTagGroup
-                {
-                    Index = groupIndex,
-                    Name = category.Name
-                })
-                .ToList();
-
-            for (var i = 0; i < groups.Count; i++)
-            {
-                var keywords = response.Categories[i].Keywords
-                    .AsValueEnumerable().Where(k => !string.IsNullOrWhiteSpace(k.Keyword))
-                    .Select((k, keywordIndex) => new SearchHotTagItem
-                    {
-                        Index = keywordIndex,
-                        Keyword = k.Keyword,
-                        Reason = k.Reason
-                    })
-                    .ToList();
-                if (keywords.Count > 0)
-                    groups[i].Keywords.AddRange(keywords);
-            }
-
-            if (groups.Count == 0)
-                return;
-
-            HotCategories.AddRange(groups);
-
-            _suppressHotSelectionChanged = true;
-            SelectedHotMainIndex = 0;
-            ResetCurrentHotKeywords(0);
-            _suppressHotSelectionChanged = false;
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "加载热搜失败");
-        }
-        finally
-        {
-            IsLoadingHot = false;
-        }
-    }
-
-    [RelayCommand]
-    private void SelectHotMainCategory(int index)
-    {
-        if (index < 0 || index >= HotCategories.Count)
-            return;
-
-        SelectedHotMainIndex = index;
-    }
-
-    partial void OnSelectedHotMainIndexChanged(int value)
-    {
-        if (_suppressHotSelectionChanged)
-            return;
-
-        ResetCurrentHotKeywords(value);
-    }
-
-    private void ResetCurrentHotKeywords(int mainIndex)
-    {
-        CurrentHotKeywords.Clear();
-        if (mainIndex < 0 || mainIndex >= HotCategories.Count)
-            return;
-
-        if (HotCategories[mainIndex].Keywords.Count > 0)
-            CurrentHotKeywords.AddRange(HotCategories[mainIndex].Keywords);
     }
 
     private void ClearResults()
@@ -302,6 +209,12 @@ public partial class SearchViewModel(
     [RelayCommand]
     private void ClearSearch()
     {
+        ResetSearchState();
+        navigationService.GoBack();
+    }
+
+    private void ResetSearchState()
+    {
         SearchKeyword = string.Empty;
         IsSearching = false;
         IsShowingDetail = false;
@@ -324,16 +237,6 @@ public partial class SearchViewModel(
         OnPropertyChanged(nameof(IsPlaylistDetail));
         OnPropertyChanged(nameof(IsAlbumDetail));
         OnPropertyChanged(nameof(CanCollectDetail));
-    }
-
-    [RelayCommand]
-    private async Task QuickSearchHotKeyword(SearchHotTagItem? item)
-    {
-        if (item == null || string.IsNullOrWhiteSpace(item.Keyword))
-            return;
-
-        SearchKeyword = item.Keyword;
-        await Search();
     }
 
     [RelayCommand]
