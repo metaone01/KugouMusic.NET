@@ -18,6 +18,9 @@
             BackCommand="{Binding BackFromPlaylistCommand}"
             IsLoadingMore="{Binding IsLoadingMore}"
             ListMargin="0"
-            ShowAddLoadedSongsToQueueButton="True" />
+            ShowAddLoadedSongsToQueueButton="True"
+            HeroDropdownLabel="排序"
+            HeroDropdownItems="{Binding SortOptions}"
+            HeroDropdownSelectedItem="{Binding CurrentSortText, Mode=TwoWay}" />
     </Grid>
 </UserControl>

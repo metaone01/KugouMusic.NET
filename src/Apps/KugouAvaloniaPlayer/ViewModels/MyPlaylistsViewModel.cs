@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using ZLinq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -21,6 +22,9 @@ namespace KugouAvaloniaPlayer.ViewModels;
 
 public partial class MyPlaylistsViewModel : PageViewModelBase, IDisposable
 {
+    private const string DefaultSortText = "默认排序";
+    private const string ArtistSortText = "按歌手排序";
+    private const string AlbumSortText = "按专辑排序";
     private const int UserPlaylistPageSize = 100;
     private const int PlaylistSongPageSize = 200;
     private const int MaxUserPlaylistPages = 200;
@@ -55,6 +59,10 @@ public partial class MyPlaylistsViewModel : PageViewModelBase, IDisposable
 
     private CancellationTokenSource? _refreshPlaylistsCts;
     private bool _isDisposed;
+    private readonly List<SongItem> _selectedPlaylistSongsDefaultOrder = new();
+
+    [ObservableProperty]
+    public partial string CurrentSortText { get; set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsOnlinePlaylist))]
@@ -80,6 +88,7 @@ public partial class MyPlaylistsViewModel : PageViewModelBase, IDisposable
         _createPlaylistDialogService = createPlaylistDialogService;
         _externalPlaylistImportService = externalPlaylistImportService;
         _logger = logger;
+        CurrentSortText = GetSortText(SettingsManager.Settings.UserPlaylistSongSortMode);
 
         _ = LoadAllPlaylists();
 
@@ -97,11 +106,29 @@ public partial class MyPlaylistsViewModel : PageViewModelBase, IDisposable
     public override string DisplayName => "我的歌单";
     public override string Icon => "/Assets/music-player-svgrepo-com.svg";
 
+    public IReadOnlyList<string> SortOptions { get; } = [DefaultSortText, ArtistSortText, AlbumSortText];
+
     public AvaloniaList<PlaylistItem> Playlists { get; } = new();
 
     public AvaloniaList<SongItem> SelectedPlaylistSongs { get; } = new();
 
     public AvaloniaList<PlaylistItem> Items { get; } = new();
+
+    partial void OnCurrentSortTextChanged(string value)
+    {
+        if (_isDisposed)
+            return;
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            CurrentSortText = GetSortText(SettingsManager.Settings.UserPlaylistSongSortMode);
+            return;
+        }
+
+        SettingsManager.Settings.UserPlaylistSongSortMode = GetSortMode(value);
+        SettingsManager.Save();
+        ApplySongSort();
+    }
 
     [RelayCommand]
     private void GoBack()
@@ -109,6 +136,7 @@ public partial class MyPlaylistsViewModel : PageViewModelBase, IDisposable
         CancelPlaylistBackgroundLoad();
         IsShowingSongs = false;
         SelectedPlaylist = null;
+        _selectedPlaylistSongsDefaultOrder.Clear();
         SelectedPlaylistSongs.Clear();
     }
 
@@ -223,6 +251,7 @@ public partial class MyPlaylistsViewModel : PageViewModelBase, IDisposable
 
         SelectedPlaylist = item;
         IsShowingSongs = true;
+        _selectedPlaylistSongsDefaultOrder.Clear();
         SelectedPlaylistSongs.Clear();
 
         _currentPage = 1;
@@ -237,7 +266,7 @@ public partial class MyPlaylistsViewModel : PageViewModelBase, IDisposable
                 var loadedLocal = false;
                 if (_favoritePlaylistService.TryGetLikePlaylistCache(out var likeCache) && likeCache.Songs.Count > 0)
                 {
-                    SelectedPlaylistSongs.AddRange(likeCache.Songs);
+                    AddSongsInDefaultOrder(likeCache.Songs);
                     _isLikePlaylistLocalMode = true;
                     _hasMoreSongs = false; // 本地快照阶段禁分页，等待远端接管
                     loadedLocal = true;
@@ -332,10 +361,12 @@ public partial class MyPlaylistsViewModel : PageViewModelBase, IDisposable
                     return;
 
                 if (replaceExisting)
-                    SelectedPlaylistSongs.Clear();
+                    _selectedPlaylistSongsDefaultOrder.Clear();
 
                 if (songItems.Count > 0)
-                    SelectedPlaylistSongs.AddRange(songItems);
+                    _selectedPlaylistSongsDefaultOrder.AddRange(songItems);
+
+                ApplySongSort();
 
                 _currentPage = page;
                 _hasMoreSongs = hasMoreSongs;
@@ -475,7 +506,10 @@ public partial class MyPlaylistsViewModel : PageViewModelBase, IDisposable
             }).ToList();
 
             if (songItems.Count > 0)
-                SelectedPlaylistSongs.AddRange(songItems);
+            {
+                _selectedPlaylistSongsDefaultOrder.AddRange(songItems);
+                ApplySongSort();
+            }
         }
         catch (Exception)
         {
@@ -703,6 +737,7 @@ public partial class MyPlaylistsViewModel : PageViewModelBase, IDisposable
         {
             CancelPlaylistBackgroundLoad();
             SelectedPlaylist = null;
+            _selectedPlaylistSongsDefaultOrder.Clear();
             SelectedPlaylistSongs.Clear();
             IsShowingSongs = false;
             WeakReferenceMessenger.Default.Send(new RequestNavigateBackMessage());
@@ -744,6 +779,7 @@ public partial class MyPlaylistsViewModel : PageViewModelBase, IDisposable
                 await _playlistClient.RemoveSongsAsync(SelectedPlaylist.ListId.ToString(), new[] { song.FileId });
             if (result != null)
             {
+                _selectedPlaylistSongsDefaultOrder.Remove(song);
                 SelectedPlaylistSongs.Remove(song);
                 // 更新歌单歌曲数量
                 if (SelectedPlaylist.Count > 0)
@@ -813,8 +849,9 @@ public partial class MyPlaylistsViewModel : PageViewModelBase, IDisposable
                 if (!IsCurrentPlaylistLoad(openedItem, loadVersion) || SelectedPlaylist == null || !IsLikePlaylist(SelectedPlaylist))
                     return;
 
-                SelectedPlaylistSongs.Clear();
-                SelectedPlaylistSongs.AddRange(songItems);
+                _selectedPlaylistSongsDefaultOrder.Clear();
+                _selectedPlaylistSongsDefaultOrder.AddRange(songItems);
+                ApplySongSort();
                 _currentPage = 1;
                 _hasMoreSongs = hasMoreSongs;
                 _isLikePlaylistLocalMode = false;
@@ -835,6 +872,47 @@ public partial class MyPlaylistsViewModel : PageViewModelBase, IDisposable
     private static bool IsLikePlaylist(PlaylistItem item)
     {
         return item.ListId == 2 || string.Equals(item.Name, "我喜欢", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void AddSongsInDefaultOrder(IEnumerable<SongItem> songs)
+    {
+        _selectedPlaylistSongsDefaultOrder.AddRange(songs);
+        ApplySongSort();
+    }
+
+    private void ApplySongSort()
+    {
+        IEnumerable<SongItem> sortedSongs = GetSortMode(CurrentSortText) switch
+        {
+            PlaylistSongSortMode.Artist => _selectedPlaylistSongsDefaultOrder
+                .OrderBy(song => song.Singer, StringComparer.CurrentCultureIgnoreCase),
+            PlaylistSongSortMode.Album => _selectedPlaylistSongsDefaultOrder
+                .OrderBy(song => song.AlbumName, StringComparer.CurrentCultureIgnoreCase),
+            _ => _selectedPlaylistSongsDefaultOrder
+        };
+
+        SelectedPlaylistSongs.Clear();
+        SelectedPlaylistSongs.AddRange(sortedSongs);
+    }
+
+    private static PlaylistSongSortMode GetSortMode(string? value)
+    {
+        return value switch
+        {
+            ArtistSortText => PlaylistSongSortMode.Artist,
+            AlbumSortText => PlaylistSongSortMode.Album,
+            _ => PlaylistSongSortMode.Default
+        };
+    }
+
+    private static string GetSortText(PlaylistSongSortMode mode)
+    {
+        return mode switch
+        {
+            PlaylistSongSortMode.Artist => ArtistSortText,
+            PlaylistSongSortMode.Album => AlbumSortText,
+            _ => DefaultSortText
+        };
     }
 
     public void Dispose()

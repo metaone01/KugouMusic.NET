@@ -10,6 +10,13 @@ public enum PlayMode
     Shuffle
 }
 
+public enum PlaylistSongSortMode
+{
+    Default,
+    Artist,
+    Album
+}
+
 public enum CloseBehavior
 {
     Exit,
@@ -154,6 +161,8 @@ public class AppSettings
     public string GlobalFontFamily { get; set; } = string.Empty;
     public string MusicQuality { get; set; } = AudioQuality.Default;
     public PlayMode PlaybackMode { get; set; } = PlayMode.Normal;
+    public PlaylistSongSortMode UserPlaylistSongSortMode { get; set; } = PlaylistSongSortMode.Default;
+    public PlaylistSongSortMode LocalPlaylistSongSortMode { get; set; } = PlaylistSongSortMode.Default;
     public List<string> LocalMusicFolders { get; set; } = new();
     public Dictionary<string, LocalPlaylistMeta> LocalPlaylistMetas { get; set; } = new();
     public Dictionary<string, JellyfinServerSettings> JellyfinServers { get; set; } = new();

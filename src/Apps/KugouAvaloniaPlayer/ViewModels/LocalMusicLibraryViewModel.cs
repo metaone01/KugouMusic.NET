@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using ZLinq;
 using System.Threading.Tasks;
 using Avalonia.Collections;
@@ -19,6 +20,9 @@ namespace KugouAvaloniaPlayer.ViewModels;
 
 public partial class LocalMusicLibraryViewModel : PageViewModelBase
 {
+    private const string DefaultSortText = "默认排序";
+    private const string ArtistSortText = "按歌手排序";
+    private const string AlbumSortText = "按专辑排序";
     private const string DefaultCover = "avares://KugouAvaloniaPlayer/Assets/default_listcard.png";
     private const string DefaultSongCover = "avares://KugouAvaloniaPlayer/Assets/default_song.png";
 
@@ -28,6 +32,10 @@ public partial class LocalMusicLibraryViewModel : PageViewModelBase
     private readonly ILocalMusicLibraryService _localMusicLibraryService;
     private readonly ILogger<LocalMusicLibraryViewModel> _logger;
     private readonly ISukiToastManager _toastManager;
+    private readonly List<SongItem> _selectedPlaylistSongsDefaultOrder = new();
+
+    [ObservableProperty]
+    public partial string CurrentSortText { get; set; }
 
     [ObservableProperty]
     public partial bool IsImportingJellyfinLibrary { get; set; }
@@ -61,6 +69,7 @@ public partial class LocalMusicLibraryViewModel : PageViewModelBase
         _localMusicLibraryService = localMusicLibraryService;
         _toastManager = toastManager;
         _logger = logger;
+        CurrentSortText = GetSortText(SettingsManager.Settings.LocalPlaylistSongSortMode);
 
         _ = LoadLocalLibraryAsync();
 
@@ -78,14 +87,30 @@ public partial class LocalMusicLibraryViewModel : PageViewModelBase
     public override string DisplayName => "本地音乐库";
     public override string Icon => "/Assets/music-folder-8-svgrepo-com.svg";
 
+    public IReadOnlyList<string> SortOptions { get; } = [DefaultSortText, ArtistSortText, AlbumSortText];
+
     public AvaloniaList<PlaylistItem> LocalLibraryPlaylists { get; } = new();
     public AvaloniaList<SongItem> SelectedPlaylistSongs { get; } = new();
+
+    partial void OnCurrentSortTextChanged(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            CurrentSortText = GetSortText(SettingsManager.Settings.LocalPlaylistSongSortMode);
+            return;
+        }
+
+        SettingsManager.Settings.LocalPlaylistSongSortMode = GetSortMode(value);
+        SettingsManager.Save();
+        ApplySongSort();
+    }
 
     [RelayCommand]
     private void GoBack()
     {
         IsShowingSongs = false;
         SelectedPlaylist = null;
+        _selectedPlaylistSongsDefaultOrder.Clear();
         SelectedPlaylistSongs.Clear();
         OnPropertyChanged(nameof(IsLocalLibraryHome));
     }
@@ -127,6 +152,7 @@ public partial class LocalMusicLibraryViewModel : PageViewModelBase
 
         SelectedPlaylist = item;
         IsShowingSongs = true;
+        _selectedPlaylistSongsDefaultOrder.Clear();
         SelectedPlaylistSongs.Clear();
         await LoadLocalPlaylistSongsAsync(item);
     }
@@ -140,8 +166,9 @@ public partial class LocalMusicLibraryViewModel : PageViewModelBase
         try
         {
             var tracks = await _localMusicLibraryService.GetPlaylistTracksAsync(playlistId);
-            SelectedPlaylistSongs.Clear();
-            SelectedPlaylistSongs.AddRange(tracks.AsValueEnumerable().Select(ToSongItem).ToArray());
+            _selectedPlaylistSongsDefaultOrder.Clear();
+            _selectedPlaylistSongsDefaultOrder.AddRange(tracks.AsValueEnumerable().Select(ToSongItem).ToArray());
+            ApplySongSort();
             item.Count = tracks.Count;
             item.Subtitle = $"{tracks.Count} 首歌曲";
         }
@@ -179,6 +206,7 @@ public partial class LocalMusicLibraryViewModel : PageViewModelBase
             if (SelectedPlaylist != null && SelectedPlaylist.Id == item.Id)
             {
                 SelectedPlaylist = null;
+                _selectedPlaylistSongsDefaultOrder.Clear();
                 SelectedPlaylistSongs.Clear();
                 IsShowingSongs = false;
             }
@@ -264,6 +292,7 @@ public partial class LocalMusicLibraryViewModel : PageViewModelBase
 
         await _localMusicLibraryService.RemoveTrackFromPlaylistAsync(playlistId, song.LocalTrackId);
 
+        _selectedPlaylistSongsDefaultOrder.Remove(song);
         SelectedPlaylistSongs.Remove(song);
         if (SelectedPlaylist.Count > 0)
             SelectedPlaylist.Count--;
@@ -375,6 +404,7 @@ public partial class LocalMusicLibraryViewModel : PageViewModelBase
     {
         IsShowingSongs = false;
         SelectedPlaylist = null;
+        _selectedPlaylistSongsDefaultOrder.Clear();
         SelectedPlaylistSongs.Clear();
     }
 
@@ -665,6 +695,41 @@ public partial class LocalMusicLibraryViewModel : PageViewModelBase
         };
         SettingsManager.Settings.LastJellyfinServerFingerprint = fingerprint;
         SettingsManager.Save();
+    }
+
+    private void ApplySongSort()
+    {
+        IEnumerable<SongItem> sortedSongs = GetSortMode(CurrentSortText) switch
+        {
+            PlaylistSongSortMode.Artist => _selectedPlaylistSongsDefaultOrder
+                .OrderBy(song => song.Singer, StringComparer.CurrentCultureIgnoreCase),
+            PlaylistSongSortMode.Album => _selectedPlaylistSongsDefaultOrder
+                .OrderBy(song => song.AlbumName, StringComparer.CurrentCultureIgnoreCase),
+            _ => _selectedPlaylistSongsDefaultOrder
+        };
+
+        SelectedPlaylistSongs.Clear();
+        SelectedPlaylistSongs.AddRange(sortedSongs);
+    }
+
+    private static PlaylistSongSortMode GetSortMode(string? value)
+    {
+        return value switch
+        {
+            ArtistSortText => PlaylistSongSortMode.Artist,
+            AlbumSortText => PlaylistSongSortMode.Album,
+            _ => PlaylistSongSortMode.Default
+        };
+    }
+
+    private static string GetSortText(PlaylistSongSortMode mode)
+    {
+        return mode switch
+        {
+            PlaylistSongSortMode.Artist => ArtistSortText,
+            PlaylistSongSortMode.Album => AlbumSortText,
+            _ => DefaultSortText
+        };
     }
 
     private static string GetImageSourceOrDefault(string? imagePath, string defaultSource)

@@ -132,6 +132,10 @@ public static class SettingsManager
             Settings.MainWindowState.State = SavedMainWindowState.Normal;
         if (!Enum.IsDefined(Settings.PlaybackMode))
             Settings.PlaybackMode = PlayMode.Normal;
+        if (!Enum.IsDefined(Settings.UserPlaylistSongSortMode))
+            Settings.UserPlaylistSongSortMode = PlaylistSongSortMode.Default;
+        if (!Enum.IsDefined(Settings.LocalPlaylistSongSortMode))
+            Settings.LocalPlaylistSongSortMode = PlaylistSongSortMode.Default;
         Settings.CustomBackgroundImagePath = string.IsNullOrWhiteSpace(Settings.CustomBackgroundImagePath)
             ? null
             : Settings.CustomBackgroundImagePath;

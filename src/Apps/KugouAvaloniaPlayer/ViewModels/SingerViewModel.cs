@@ -127,6 +127,12 @@ public partial class SingerViewModel : PageViewModelBase, IDisposable
         if (_isDisposed)
             return;
 
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            CurrentSortText = HotSortText;
+            return;
+        }
+
         if (value == AlbumsText)
         {
             IsAlbumBrowserVisible = true;
