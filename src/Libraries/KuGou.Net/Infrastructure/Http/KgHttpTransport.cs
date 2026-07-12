@@ -13,6 +13,8 @@ public interface IKgTransport
 
 public class KgHttpTransport(HttpClient client) : IKgTransport
 {
+    private const int MaxGetAttempts = 3;
+
     public async Task<JsonElement> SendAsync(KgRequest request)
     {
         var baseUrl = request.BaseUrl ?? "https://gateway.kugou.com";
@@ -26,7 +28,26 @@ public class KgHttpTransport(HttpClient client) : IKgTransport
             urlBuilder.Append(queryString);
         }
 
-        using var msg = new HttpRequestMessage(request.Method, urlBuilder.ToString());
+        var requestUrl = urlBuilder.ToString();
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                return await SendOnceAsync(request, requestUrl);
+            }
+            catch (HttpRequestException ex) when (
+                request.Method == HttpMethod.Get &&
+                attempt < MaxGetAttempts &&
+                IsTransient(ex))
+            {
+                await Task.Delay(GetRetryDelay(attempt));
+            }
+        }
+    }
+
+    private async Task<JsonElement> SendOnceAsync(KgRequest request, string requestUrl)
+    {
+        using var msg = new HttpRequestMessage(request.Method, requestUrl);
         msg.Options.Set(new HttpRequestOptionsKey<KgRequest>("KgRequestDetail"), request);
 
         if (request.CustomHeaders != null)
@@ -80,5 +101,21 @@ public class KgHttpTransport(HttpClient client) : IKgTransport
             var fallbackDoc = JsonSerializer.SerializeToElement(fallbackJson, AppJsonContext.Default.JsonObject);
             return fallbackDoc;
         }
+    }
+
+    private static bool IsTransient(HttpRequestException exception)
+    {
+        if (exception.StatusCode is null)
+            return true;
+
+        var statusCode = (int)exception.StatusCode.Value;
+        return statusCode is 408 or 429 || statusCode >= 500;
+    }
+
+    private static TimeSpan GetRetryDelay(int failedAttempt)
+    {
+        return failedAttempt == 1
+            ? TimeSpan.FromMilliseconds(250)
+            : TimeSpan.FromMilliseconds(750);
     }
 }

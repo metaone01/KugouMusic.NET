@@ -5,6 +5,9 @@ namespace SimpleAudio;
 
 public partial class SimpleAudioPlayer : IDisposable
 {
+    private const int RemoteStreamLoadAttempts = 3;
+    private const int RemoteStreamRetryDelayMilliseconds = 300;
+
     public string? LastErrorDetail { get; private set; }
 
     public bool Load(string url)
@@ -29,7 +32,15 @@ public partial class SimpleAudioPlayer : IDisposable
 
             if (url.StartsWith("http", StringComparison.OrdinalIgnoreCase))
             {
-                sourceStream = Bass.CreateStream(url, 0, sourceFlags, null, IntPtr.Zero);
+                for (var attempt = 1; attempt <= RemoteStreamLoadAttempts; attempt++)
+                {
+                    sourceStream = Bass.CreateStream(url, 0, sourceFlags, null, IntPtr.Zero);
+                    if (sourceStream != 0)
+                        break;
+
+                    if (attempt < RemoteStreamLoadAttempts)
+                        Thread.Sleep(RemoteStreamRetryDelayMilliseconds * attempt);
+                }
             }
             else if (File.Exists(url))
             {
