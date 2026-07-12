@@ -16,7 +16,7 @@
             Subtitle="{Binding Subtitle}"
             Songs="{Binding Songs}"
             PlayFirstCommand="{Binding PlayFirstCommand}"
-            BackCommand="{Binding $parent[suki:SukiWindow].((vm:MainWindowViewModel)DataContext).NavigateBackCommand}"
+            BackCommand="{Binding $parent[localControls:KugouWindow].((vm:MainWindowViewModel)DataContext).NavigateBackCommand}"
             ListMargin="0"
             HeroActionCommand="{Binding ClearHistoryCommand}"
             HeroActionSvgPath="/Assets/trash-svgrepo-com.svg" />

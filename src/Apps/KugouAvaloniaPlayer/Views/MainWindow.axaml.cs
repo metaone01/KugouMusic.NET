@@ -11,12 +11,12 @@ using CommunityToolkit.Mvvm.Messaging;
 using KugouAvaloniaPlayer.Models;
 using KugouAvaloniaPlayer.Services;
 using KugouAvaloniaPlayer.ViewModels;
-using SukiUI.Controls;
+using KugouAvaloniaPlayer.Controls;
 using Size = Avalonia.Size;
 
 namespace KugouAvaloniaPlayer.Views;
 
-public partial class MainWindow : SukiWindow
+public partial class MainWindow : KugouWindow
 {
     private PixelPoint? _lastNormalPosition;
     private Size? _lastNormalSize;
@@ -31,6 +31,7 @@ public partial class MainWindow : SukiWindow
     public MainWindow()
     {
         InitializeComponent();
+        InitializeWindowChrome(TitleBar, MaximizeButton, MainGrid);
         ApplyLinuxSystemWindowDecorationsFallback();
         RestoreWindowState();
 /*#if DEBUG
@@ -62,10 +63,7 @@ public partial class MainWindow : SukiWindow
 #if KUGOU_LINUX
     private void ApplyLinuxWindowDecorations(bool useFullDecorations)
     {
-        ExtendClientAreaToDecorationsHint = false;
-        WindowDecorations = useFullDecorations
-            ? WindowDecorations.Full
-            : WindowDecorations.BorderOnly;
+        ConfigureLinuxDecorations(useFullDecorations);
     }
 #endif
 
@@ -130,12 +128,7 @@ public partial class MainWindow : SukiWindow
                 ToggleFullScreen();
                 break;
             case MainWindowChromeAction.ToggleMaximize:
-                if (WindowState == WindowState.FullScreen)
-                    break;
-
-                WindowState = WindowState == WindowState.Maximized
-                    ? WindowState.Normal
-                    : WindowState.Maximized;
+                ToggleMaximizeOrZoom();
                 break;
             case MainWindowChromeAction.Close:
                 Close();

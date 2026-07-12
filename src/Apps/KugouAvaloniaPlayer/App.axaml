@@ -21,12 +21,6 @@
         <Style Selector="SelectableTextBlock">
             <Setter Property="FontFamily" Value="{DynamicResource AppDefaultFontFamily}" />
         </Style>
-        <Style Selector="suki|SukiWindow[IsTitleBarVisible=False] /template/ Border#PART_BottomBorder">
-            <Setter Property="IsVisible" Value="False" />
-        </Style>
-        <Style Selector="suki|SukiWindow[IsTitleBarVisible=True] /template/ Border#PART_BottomBorder">
-            <Setter Property="IsVisible" Value="True" />
-        </Style>
         <StyleInclude Source="avares://KugouAvaloniaPlayer/Styles/SukiMainHostCustomBackground.axaml" />
         <StyleInclude Source="avares://KugouAvaloniaPlayer/Styles/KugouSideMenu.axaml" />
         <StyleInclude Source="avares://KugouAvaloniaPlayer/Styles/SliderPlayer.axaml" />

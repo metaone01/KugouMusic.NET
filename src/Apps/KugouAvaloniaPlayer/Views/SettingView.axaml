@@ -5,6 +5,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:asyncImageLoader="clr-namespace:AsyncImageLoader;assembly=AsyncImageLoader.Avalonia"
              xmlns:behaviors="using:KugouAvaloniaPlayer.Behaviors"
+             xmlns:localControls="using:KugouAvaloniaPlayer.Controls"
              xmlns:suki="https://github.com/kikipoulet/SukiUI"
              xmlns:models="clr-namespace:KugouAvaloniaPlayer.Models"
              xmlns:simpleAudio="clr-namespace:SimpleAudio;assembly=SimpleAudio"
@@ -100,7 +101,7 @@
 
                         <Button Grid.Column="1"
                                 Classes="Basic"
-                                Command="{Binding $parent[suki:SukiWindow].((vm:MainWindowViewModel)DataContext).NavigateBackCommand}"
+                                Command="{Binding $parent[localControls:KugouWindow].((vm:MainWindowViewModel)DataContext).NavigateBackCommand}"
                                 HorizontalAlignment="Right"
                                 VerticalAlignment="Center"
                                 Cursor="Hand"
