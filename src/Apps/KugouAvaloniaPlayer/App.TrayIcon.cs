@@ -5,7 +5,6 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Platform;
 using CommunityToolkit.Mvvm.Messaging;
 using KugouAvaloniaPlayer.Models;
-using KugouAvaloniaPlayer.Services;
 using KugouAvaloniaPlayer.ViewModels;
 using KugouAvaloniaPlayer.Views;
 
@@ -28,7 +27,8 @@ partial class App
 
         var showItem = new NativeMenuItem("显示主界面");
 
-        showItem.Click += (s, e) => ShowMainWindow(desktop);
+        showItem.Click += (_, _) =>
+            WeakReferenceMessenger.Default.Send(new ShowMainWindowMessage());
 
         var showLyric = new NativeMenuItem("桌面歌词");
         showLyric.Click += (s, e) =>
@@ -81,7 +81,8 @@ partial class App
             IsVisible = true
         };
 
-        _trayIcon.Clicked += (s, e) => ShowMainWindow(desktop);
+        _trayIcon.Clicked += (_, _) =>
+            WeakReferenceMessenger.Default.Send(new ShowMainWindowMessage());
 
         player.PropertyChanged += OnPlayerPropertyChanged;
 
@@ -97,11 +98,6 @@ partial class App
     {
         if (_playPauseItem != null && _playerViewModel != null)
             Dispatcher.Post(() => { _playPauseItem.Header = _playerViewModel.IsPlayingAudio ? "暂停" : "播放"; });
-    }
-
-    private void ShowMainWindow(IClassicDesktopStyleApplicationLifetime desktop)
-    {
-        MainWindowPresentationHelper.ShowAndActivate(desktop.MainWindow);
     }
 
     private void ShutdownTrayIcon()

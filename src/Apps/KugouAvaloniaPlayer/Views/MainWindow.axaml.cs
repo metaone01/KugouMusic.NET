@@ -69,13 +69,24 @@ public partial class MainWindow : KugouWindow
 
     protected override void OnClosing(WindowClosingEventArgs e)
     {
+#if KUGOU_MACOS
+        if (!CanClose)
+        {
+            e.Cancel = true;
+            SaveWindowState();
+            Hide();
+            return;
+        }
+#else
         var behavior = SettingsManager.Settings.CloseBehavior;
         if (behavior == CloseBehavior.MinimizeToTray && !CanClose)
         {
             e.Cancel = true;
+            SaveWindowState();
             Hide();
             return;
         }
+#endif
 
         if (DataContext is MainWindowViewModel vm) vm.ForceCloseDesktopLyric();
 

@@ -6,6 +6,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Avalonia.Styling;
 using Avalonia.Threading;
+using CommunityToolkit.Mvvm.Messaging;
 using KugouAvaloniaPlayer.Models;
 using KugouAvaloniaPlayer.Services;
 using KugouAvaloniaPlayer.Services.GlobalShortcutService;
@@ -80,9 +81,28 @@ public partial class App : Application
                 mainWindow.Opened += InitializeGlobalShortcuts;
                 startupActivationServer.Start();
 
+#if KUGOU_MACOS
+                var activatableLifetime = this.TryGetFeature<IActivatableLifetime>();
+
+                void OnApplicationActivated(object? _, ActivatedEventArgs e)
+                {
+                    if (e.Kind == ActivationKind.Reopen)
+                        WeakReferenceMessenger.Default.Send(new ShowMainWindowMessage());
+                }
+
+                if (activatableLifetime != null)
+                    activatableLifetime.Activated += OnApplicationActivated;
+
+                desktop.ShutdownRequested += (_, _) => mainWindow.CanClose = true;
+#endif
+
                 InitializeTrayIcon(playerVm, desktop, vm);
                 desktop.Exit += (s, e) =>
                 {
+#if KUGOU_MACOS
+                    if (activatableLifetime != null)
+                        activatableLifetime.Activated -= OnApplicationActivated;
+#endif
                     startupActivationServer.Stop();
                     globalShortcutService.UnregisterAll();
                     systemMediaSessionService.Shutdown();

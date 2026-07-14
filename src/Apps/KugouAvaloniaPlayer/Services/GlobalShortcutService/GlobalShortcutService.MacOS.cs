@@ -83,7 +83,7 @@ public sealed partial class GlobalShortcutService
         var status = RegisterEventHotKey(
             keyCode.Value,
             ToMacModifiers(gesture.Modifiers),
-            ref hotKeyId,
+            hotKeyId,
             GetApplicationEventTarget(),
             0,
             out var hotKeyRef);
@@ -229,7 +229,7 @@ public sealed partial class GlobalShortcutService
     private static partial int RegisterEventHotKey(
         uint inHotKeyCode,
         uint inHotKeyModifiers,
-        ref EventHotKeyId inHotKeyId,
+        EventHotKeyId inHotKeyId,
         IntPtr inTarget,
         uint inOptions,
         out IntPtr outRef);
