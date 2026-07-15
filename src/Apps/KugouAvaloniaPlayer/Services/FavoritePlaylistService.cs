@@ -43,12 +43,14 @@ public partial class FavoritePlaylistService(
     private readonly Dictionary<string, int> _hashToFileId = new();
     private readonly SemaphoreSlim _addToPlaylistDialogLock = new(1, 1);
     private readonly SemaphoreSlim _likeCacheLoadLock = new(1, 1);
-    private readonly HashSet<string> _likedHashes = new();
+    private readonly Lock _likeCacheStateLock = new();
+    private readonly HashSet<string> _likedHashes = [];
     private bool _hasLoggedFirstLikeCacheSuccess;
     private string _likeListIdForAction = LikeListIdForAction;
 
     private LikeCacheFileModel? _latestCache;
     private int _likeCacheLoadAttemptCount;
+    private long _likeCacheMutationVersion;
     private bool _loadedFromLocalCache;
 
     public async Task LoadLikeListAsync()
@@ -68,22 +70,24 @@ public partial class FavoritePlaylistService(
                 _loadedFromLocalCache = true;
                 if (isFirstAttempt)
                 {
+                    var localCounts = GetLikeCacheStateCounts();
                     _hasLoggedFirstLikeCacheSuccess = true;
                     logger.LogInformation(
                         "我喜欢缓存本地命中秒开: source=local cache_hit=true songs={SongCount} hashes={HashCount} fileIds={FileIdCount} updatedAt={UpdatedAt}",
                         localCache!.Items.Count,
-                        _likedHashes.Count,
-                        _hashToFileId.Count,
+                        localCounts.HashCount,
+                        localCounts.FileIdCount,
                         localCache.UpdatedAt);
                 }
             }
 
+            var refreshStartVersion = GetLikeCacheMutationVersion();
             var playlists = await userClient.GetPlaylistsAsync();
             if (playlists is null || playlists.Status != 1)
             {
                 logger.LogWarning(
                     "我喜欢远端刷新失败: source=remote cache_hit={CacheHit} fallback_reason=playlist_list_error remote_err_code={ErrorCode}",
-                    _latestCache != null,
+                    HasLikeCache(),
                     playlists?.ErrorCode);
                 return;
             }
@@ -91,7 +95,7 @@ public partial class FavoritePlaylistService(
             if (playlists.Playlists.Count < 1)
             {
                 logger.LogWarning("我喜欢远端刷新失败: source=remote cache_hit={CacheHit} fallback_reason=no_playlists",
-                    _latestCache != null);
+                    HasLikeCache());
                 return;
             }
 
@@ -100,17 +104,17 @@ public partial class FavoritePlaylistService(
             {
                 logger.LogWarning(
                     "我喜欢远端刷新失败: source=remote cache_hit={CacheHit} fallback_reason=like_playlist_not_found",
-                    _latestCache != null);
+                    HasLikeCache());
                 return;
             }
 
-            _likeListIdForAction = likePlaylist.ListId.ToString();
+            SetLikeListIdForAction(likePlaylist.ListId.ToString());
 
             if (string.IsNullOrWhiteSpace(likePlaylist.ListCreateId))
             {
                 logger.LogWarning(
                     "我喜欢远端刷新失败: source=remote cache_hit={CacheHit} fallback_reason=like_playlist_missing_create_id",
-                    _latestCache != null);
+                    HasLikeCache());
                 return;
             }
 
@@ -118,7 +122,7 @@ public partial class FavoritePlaylistService(
             if (data is null)
             {
                 logger.LogWarning("我喜欢远端刷新失败: source=remote cache_hit={CacheHit} fallback_reason=response_null",
-                    _latestCache != null);
+                    HasLikeCache());
                 return;
             }
 
@@ -126,7 +130,7 @@ public partial class FavoritePlaylistService(
             {
                 logger.LogWarning(
                     "我喜欢远端刷新失败: source=remote cache_hit={CacheHit} fallback_reason=remote_error remote_err_code={ErrorCode} status={Status}",
-                    _latestCache != null,
+                    HasLikeCache(),
                     data.ErrorCode,
                     data.Status);
                 return;
@@ -134,20 +138,34 @@ public partial class FavoritePlaylistService(
 
             var songs = data.Songs ?? new List<PlaylistSong>();
             var remoteCache = BuildCacheModelFromRemote(likePlaylist, songs);
-            ApplyCacheToMemory(remoteCache, "remote");
-            SaveLikeCacheToDisk(remoteCache);
+            LikeCacheStateCounts remoteCounts;
+            lock (_likeCacheStateLock)
+            {
+                if (_likeCacheMutationVersion != refreshStartVersion)
+                {
+                    logger.LogInformation(
+                        "跳过过期的我喜欢远端刷新: source=remote refresh_version={RefreshVersion} current_version={CurrentVersion}",
+                        refreshStartVersion,
+                        _likeCacheMutationVersion);
+                    return;
+                }
+
+                ApplyCacheToMemory(remoteCache, "remote");
+                SaveLikeCacheToDisk(remoteCache);
+                remoteCounts = GetLikeCacheStateCounts();
+            }
 
             if (isFirstAttempt || !_hasLoggedFirstLikeCacheSuccess)
             {
                 _hasLoggedFirstLikeCacheSuccess = true;
                 logger.LogInformation(
                     "我喜欢远端刷新成功: source=remote songs={SongCount} hashes={HashCount} fileIds={FileIdCount}",
-                    songs.Count, _likedHashes.Count, _hashToFileId.Count);
+                    songs.Count, remoteCounts.HashCount, remoteCounts.FileIdCount);
             }
             else
             {
                 logger.LogDebug("我喜欢远端刷新成功: source=remote songs={SongCount} hashes={HashCount} fileIds={FileIdCount}",
-                    songs.Count, _likedHashes.Count, _hashToFileId.Count);
+                    songs.Count, remoteCounts.HashCount, remoteCounts.FileIdCount);
             }
         }
         catch (Exception ex)
@@ -162,17 +180,25 @@ public partial class FavoritePlaylistService(
 
     public bool TryGetLikePlaylistCache(out LikePlaylistCacheSnapshot snapshot)
     {
-        if (_latestCache != null)
+        lock (_likeCacheStateLock)
         {
-            snapshot = ToSnapshot(_latestCache);
-            return snapshot.Songs.Count > 0;
+            if (_latestCache != null)
+            {
+                snapshot = ToSnapshot(_latestCache);
+                return snapshot.Songs.Count > 0;
+            }
         }
 
         if (TryLoadLikeCacheFromDisk(out var diskCache))
         {
-            ApplyCacheToMemory(diskCache!, "local");
-            snapshot = ToSnapshot(diskCache!);
-            return snapshot.Songs.Count > 0;
+            lock (_likeCacheStateLock)
+            {
+                if (_latestCache == null)
+                    ApplyCacheToMemory(diskCache!, "local");
+
+                snapshot = ToSnapshot(_latestCache ?? diskCache!);
+                return snapshot.Songs.Count > 0;
+            }
         }
 
         snapshot = new LikePlaylistCacheSnapshot();
@@ -181,34 +207,48 @@ public partial class FavoritePlaylistService(
 
     public bool IsLiked(string hash)
     {
-        if (string.IsNullOrEmpty(hash))
+        var normalizedHash = NormalizeHash(hash);
+        if (normalizedHash.Length == 0)
             return false;
 
-        lock (_likedHashes)
+        lock (_likeCacheStateLock)
         {
-            return _likedHashes.Contains(hash.ToLowerInvariant());
+            return _likedHashes.Contains(normalizedHash);
         }
     }
 
     public async Task<bool> ToggleLikeAsync(SongItem song, bool currentIsLiked)
     {
-        var hash = song.Hash.ToLowerInvariant();
+        var hash = NormalizeHash(song.Hash);
+        if (hash.Length == 0)
+            return currentIsLiked;
+
         try
         {
+            string likeListId;
+            int fileId;
+            bool hasFileId;
+            lock (_likeCacheStateLock)
+            {
+                likeListId = _likeListIdForAction;
+                hasFileId = _hashToFileId.TryGetValue(hash, out fileId);
+            }
+
             if (currentIsLiked)
             {
-                if (_hashToFileId.TryGetValue(hash, out var fileId))
+                if (hasFileId)
                 {
-                    var result = await playlistClient.RemoveSongsAsync(_likeListIdForAction, new List<long> { fileId });
+                    var result = await playlistClient.RemoveSongsAsync(likeListId, new List<long> { fileId });
                     if (result?.Status == 1)
                     {
-                        lock (_likedHashes)
+                        lock (_likeCacheStateLock)
                         {
                             _likedHashes.Remove(hash);
                             _hashToFileId.Remove(hash);
+                            _likeCacheMutationVersion++;
+                            PersistCurrentLikeCacheSnapshot();
                         }
 
-                        PersistCurrentLikeCacheSnapshot();
                         return false;
                     }
                 }
@@ -223,16 +263,16 @@ public partial class FavoritePlaylistService(
                 {
                     (song.Name, song.Hash, song.AlbumId, "0")
                 };
-                var result = await playlistClient.AddSongsAsync(_likeListIdForAction, songList);
+                var result = await playlistClient.AddSongsAsync(likeListId, songList);
                 if (result?.Status == 1)
                 {
-                    lock (_likedHashes)
+                    lock (_likeCacheStateLock)
                     {
                         _likedHashes.Add(hash);
+                        UpsertSongInCache(song);
+                        _likeCacheMutationVersion++;
+                        PersistCurrentLikeCacheSnapshot();
                     }
-
-                    UpsertSongInCache(song);
-                    PersistCurrentLikeCacheSnapshot();
 
                     _ = Task.Run(async () =>
                     {
@@ -487,6 +527,7 @@ public partial class FavoritePlaylistService(
         var successPlaylists = new List<string>();
         var failedPlaylists = new List<string>();
         var likePlaylistUpdated = false;
+        var likeListId = GetLikeListIdForAction();
 
         try
         {
@@ -502,7 +543,7 @@ public partial class FavoritePlaylistService(
                 if (result?.Status == 1)
                 {
                     successPlaylists.Add(playlist.Name);
-                    if (playlist.ListId == _likeListIdForAction)
+                    if (playlist.ListId == likeListId)
                     {
                         UpdateLikeCacheAfterBatchAdd(songs);
                         likePlaylistUpdated = true;
@@ -567,57 +608,79 @@ public partial class FavoritePlaylistService(
 
     private void UpsertSongInCache(SongItem song)
     {
-        var cache = EnsureCacheForCurrentUser();
-        var existing =
-            cache.Items.AsValueEnumerable().FirstOrDefault(x => string.Equals(x.Hash, song.Hash, StringComparison.OrdinalIgnoreCase));
-        if (existing != null)
-        {
-            existing.FileId = song.FileId == 0 ? existing.FileId : (int)song.FileId;
-            existing.Name = string.IsNullOrWhiteSpace(song.Name) ? existing.Name : song.Name;
-            existing.Singer = string.IsNullOrWhiteSpace(song.Singer) ? existing.Singer : song.Singer;
-            existing.AlbumId = string.IsNullOrWhiteSpace(song.AlbumId) ? existing.AlbumId : song.AlbumId;
-            existing.Cover = string.IsNullOrWhiteSpace(song.Cover) ? existing.Cover : song.Cover;
-            existing.DurationSeconds = song.DurationSeconds > 0 ? song.DurationSeconds : existing.DurationSeconds;
-            existing.Singers = song.Singers?.AsValueEnumerable().ToList() ?? existing.Singers;
+        var normalizedHash = NormalizeHash(song.Hash);
+        if (normalizedHash.Length == 0)
             return;
-        }
 
-        cache.Items.Add(new LikeSongCacheItem
+        lock (_likeCacheStateLock)
         {
-            Hash = song.Hash,
-            FileId = (int)song.FileId,
-            Name = song.Name,
-            Singer = song.Singer,
-            AlbumId = song.AlbumId,
-            Cover = song.Cover,
-            DurationSeconds = song.DurationSeconds,
-            Singers = song.Singers?.AsValueEnumerable().ToList() ?? new List<SingerLite>()
-        });
+            var cache = EnsureCacheForCurrentUser();
+            var existing = cache.Items.AsValueEnumerable()
+                .FirstOrDefault(x => NormalizeHash(x.Hash) == normalizedHash);
+            if (existing != null)
+            {
+                existing.FileId = song.FileId == 0 ? existing.FileId : (int)song.FileId;
+                existing.Name = string.IsNullOrWhiteSpace(song.Name) ? existing.Name : song.Name;
+                existing.Singer = string.IsNullOrWhiteSpace(song.Singer) ? existing.Singer : song.Singer;
+                existing.AlbumId = string.IsNullOrWhiteSpace(song.AlbumId) ? existing.AlbumId : song.AlbumId;
+                existing.Cover = string.IsNullOrWhiteSpace(song.Cover) ? existing.Cover : song.Cover;
+                existing.DurationSeconds = song.DurationSeconds > 0 ? song.DurationSeconds : existing.DurationSeconds;
+                existing.Singers = song.Singers?.AsValueEnumerable().ToList() ?? existing.Singers;
+                return;
+            }
+
+            cache.Items.Add(new LikeSongCacheItem
+            {
+                Hash = song.Hash.Trim(),
+                FileId = (int)song.FileId,
+                Name = song.Name,
+                Singer = song.Singer,
+                AlbumId = song.AlbumId,
+                Cover = song.Cover,
+                DurationSeconds = song.DurationSeconds,
+                Singers = song.Singers?.AsValueEnumerable().ToList() ?? new List<SingerLite>()
+            });
+        }
     }
 
     private void PersistCurrentLikeCacheSnapshot()
     {
-        var cache = EnsureCacheForCurrentUser();
-        cache.UpdatedAt = DateTimeOffset.Now.ToString("O");
-
-        lock (_likedHashes)
+        lock (_likeCacheStateLock)
         {
-            var index = cache.Items.AsValueEnumerable().ToDictionary(x => x.Hash.ToLowerInvariant(), x => x);
+            var cache = EnsureCacheForCurrentUser();
+            cache.UpdatedAt = DateTimeOffset.Now.ToString("O");
+            NormalizeCacheItems(cache, "memory");
+
+            var indexedHashes = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var item in cache.Items)
+                indexedHashes.Add(NormalizeHash(item.Hash));
+
             foreach (var hash in _likedHashes)
-                if (!index.ContainsKey(hash))
+                if (indexedHashes.Add(hash))
                     cache.Items.Add(new LikeSongCacheItem
                     {
                         Hash = hash,
                         FileId = _hashToFileId.GetValueOrDefault(hash)
                     });
 
-            cache.Items = cache.Items
-                .AsValueEnumerable().Where(x => !string.IsNullOrWhiteSpace(x.Hash) && _likedHashes.Contains(x.Hash.ToLowerInvariant()))
-                .ToList();
-        }
+            var filteredItems = new List<LikeSongCacheItem>(cache.Items.Count);
+            var persistedHashes = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var item in cache.Items)
+            {
+                var normalizedHash = NormalizeHash(item.Hash);
+                if (normalizedHash.Length == 0 ||
+                    !_likedHashes.Contains(normalizedHash) ||
+                    !persistedHashes.Add(normalizedHash))
+                    continue;
 
-        _latestCache = cache;
-        SaveLikeCacheToDisk(cache);
+                filteredItems.Add(item);
+            }
+
+            cache.Items = filteredItems;
+            _latestCache = cache;
+
+            SaveLikeCacheToDisk(cache);
+        }
     }
 
     private async Task AddSongToPlaylistInnerAsync(SongItem song, string playlistId, string playlistName)
@@ -638,7 +701,7 @@ public partial class FavoritePlaylistService(
 
             if (result?.Status == 1)
             {
-                if (playlistId == _likeListIdForAction)
+                if (playlistId == GetLikeListIdForAction())
                 {
                     UpdateLikeCacheAfterBatchAdd([song]);
 
@@ -687,32 +750,28 @@ public partial class FavoritePlaylistService(
 
     private void UpdateLikeCacheAfterBatchAdd(IEnumerable<SongItem> songs)
     {
-        var changed = false;
-
-        lock (_likedHashes)
-        {
-            foreach (var song in songs)
-            {
-                if (string.IsNullOrWhiteSpace(song.Hash))
-                    continue;
-
-                _likedHashes.Add(song.Hash.ToLowerInvariant());
-                changed = true;
-            }
-        }
-
-        if (!changed)
+        var validSongs = songs.AsValueEnumerable()
+            .Where(song => NormalizeHash(song.Hash).Length > 0)
+            .ToList();
+        if (validSongs.Count == 0)
             return;
 
-        foreach (var song in songs)
-            UpsertSongInCache(song);
+        lock (_likeCacheStateLock)
+        {
+            foreach (var song in validSongs)
+            {
+                _likedHashes.Add(NormalizeHash(song.Hash));
+                UpsertSongInCache(song);
+            }
 
-        PersistCurrentLikeCacheSnapshot();
+            _likeCacheMutationVersion++;
+            PersistCurrentLikeCacheSnapshot();
+        }
     }
 
     private LikeCacheFileModel BuildCacheModelFromRemote(UserPlaylistItem likePlaylist, List<PlaylistSong> songs)
     {
-        return new LikeCacheFileModel
+        var cache = new LikeCacheFileModel
         {
             SchemaVersion = CacheSchemaVersion,
             UserId = GetCurrentUserId(),
@@ -738,12 +797,15 @@ public partial class FavoritePlaylistService(
                 })
                 .ToList()
         };
+
+        return NormalizeCacheModel(cache, "remote", out _);
     }
 
     private void ApplyCacheToMemory(LikeCacheFileModel cache, string source)
     {
-        lock (_likedHashes)
+        lock (_likeCacheStateLock)
         {
+            NormalizeCacheModel(cache, source, out _);
             _likedHashes.Clear();
             _hashToFileId.Clear();
 
@@ -752,44 +814,47 @@ public partial class FavoritePlaylistService(
                 if (string.IsNullOrWhiteSpace(item.Hash))
                     continue;
 
-                var normalized = item.Hash.ToLowerInvariant();
+                var normalized = NormalizeHash(item.Hash);
                 _likedHashes.Add(normalized);
                 if (item.FileId != 0)
                     _hashToFileId[normalized] = item.FileId;
             }
+
+            if (cache.PlaylistListId > 0)
+                _likeListIdForAction = cache.PlaylistListId.ToString();
+
+            cache.Source = source;
+            _latestCache = cache;
         }
-
-        if (cache.PlaylistListId > 0)
-            _likeListIdForAction = cache.PlaylistListId.ToString();
-
-        cache.Source = source;
-        _latestCache = cache;
     }
 
     private LikeCacheFileModel EnsureCacheForCurrentUser()
     {
-        if (_latestCache != null)
-            return _latestCache;
-
-        if (TryLoadLikeCacheFromDisk(out var cache))
+        lock (_likeCacheStateLock)
         {
-            _latestCache = cache;
-            return cache!;
+            if (_latestCache != null)
+                return _latestCache;
+
+            if (TryLoadLikeCacheFromDisk(out var cache))
+            {
+                _latestCache = cache;
+                return cache!;
+            }
+
+            return _latestCache = new LikeCacheFileModel
+            {
+                SchemaVersion = CacheSchemaVersion,
+                UserId = GetCurrentUserId(),
+                UpdatedAt = DateTimeOffset.Now.ToString("O"),
+                Source = "local",
+                PlaylistName = "我喜欢",
+                PlaylistListId = 2,
+                PlaylistIsDefault = 2,
+                PlaylistCreateId = "",
+                PlaylistCount = 0,
+                Items = new List<LikeSongCacheItem>()
+            };
         }
-
-        return _latestCache = new LikeCacheFileModel
-        {
-            SchemaVersion = CacheSchemaVersion,
-            UserId = GetCurrentUserId(),
-            UpdatedAt = DateTimeOffset.Now.ToString("O"),
-            Source = "local",
-            PlaylistName = "我喜欢",
-            PlaylistListId = 2,
-            PlaylistIsDefault = 2,
-            PlaylistCreateId = "",
-            PlaylistCount = 0,
-            Items = new List<LikeSongCacheItem>()
-        };
     }
 
     private LikePlaylistCacheSnapshot ToSnapshot(LikeCacheFileModel cache)
@@ -850,7 +915,10 @@ public partial class FavoritePlaylistService(
             if (model?.Items == null || model.Items.Count == 0)
                 return false;
 
-            cache = NormalizeCacheModel(model, "local");
+            cache = NormalizeCacheModel(model, "local", out var duplicateCount);
+            if (duplicateCount > 0)
+                SaveLikeCacheToDisk(cache);
+
             return true;
         }
         catch (Exception ex)
@@ -877,7 +945,7 @@ public partial class FavoritePlaylistService(
             if (legacy?.Items == null || legacy.Items.Count == 0)
                 return false;
 
-            cache = NormalizeCacheModel(legacy, "local");
+            cache = NormalizeCacheModel(legacy, "local", out _);
             AppSqliteStore.SaveValue(
                 StoreScope,
                 GetCurrentUserId(),
@@ -893,13 +961,17 @@ public partial class FavoritePlaylistService(
         }
     }
 
-    private static LikeCacheFileModel NormalizeCacheModel(LikeCacheFileModel cache, string source)
+    private LikeCacheFileModel NormalizeCacheModel(
+        LikeCacheFileModel cache,
+        string source,
+        out int duplicateCount)
     {
         cache.SchemaVersion = cache.SchemaVersion <= 0 ? 1 : cache.SchemaVersion;
         cache.PlaylistName = string.IsNullOrWhiteSpace(cache.PlaylistName) ? "我喜欢" : cache.PlaylistName;
         cache.PlaylistListId = cache.PlaylistListId == 0 ? 2 : cache.PlaylistListId;
         cache.PlaylistIsDefault = cache.PlaylistIsDefault == 0 ? 2 : cache.PlaylistIsDefault;
         cache.Items ??= new List<LikeSongCacheItem>();
+        duplicateCount = NormalizeCacheItems(cache, source);
         cache.UpdatedAt = string.IsNullOrWhiteSpace(cache.UpdatedAt)
             ? DateTimeOffset.Now.ToString("O")
             : cache.UpdatedAt;
@@ -911,15 +983,126 @@ public partial class FavoritePlaylistService(
     {
         try
         {
-            var json = JsonSerializer.Serialize(cache, LikeCacheJsonContext.Default.LikeCacheFileModel);
-            AppSqliteStore.SaveValue(StoreScope, GetCurrentUserId(), json);
-            AppSqliteStore.DeleteFileIfExists(GetLikeCacheFilePath());
+            lock (_likeCacheStateLock)
+            {
+                NormalizeCacheModel(
+                    cache,
+                    string.IsNullOrWhiteSpace(cache.Source) ? "memory" : cache.Source,
+                    out _);
+                var json = JsonSerializer.Serialize(cache, LikeCacheJsonContext.Default.LikeCacheFileModel);
+                AppSqliteStore.SaveValue(StoreScope, GetCurrentUserId(), json);
+                AppSqliteStore.DeleteFileIfExists(GetLikeCacheFilePath());
+            }
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "写入本地“我喜欢”缓存失败。 path={Path}", GetLikeCacheFilePath());
         }
     }
+
+    private int NormalizeCacheItems(LikeCacheFileModel cache, string source)
+    {
+        cache.Items = DeduplicateLikeCacheItems(cache.Items, out var duplicateCount);
+        if (duplicateCount > 0)
+        {
+            logger.LogWarning(
+                "我喜欢缓存发现并合并重复 Hash: source={Source} duplicate_count={DuplicateCount} item_count={ItemCount}",
+                source,
+                duplicateCount,
+                cache.Items.Count);
+        }
+
+        return duplicateCount;
+    }
+
+    private static List<LikeSongCacheItem> DeduplicateLikeCacheItems(
+        IEnumerable<LikeSongCacheItem> items,
+        out int duplicateCount)
+    {
+        duplicateCount = 0;
+        var result = new List<LikeSongCacheItem>();
+        var index = new Dictionary<string, LikeSongCacheItem>(StringComparer.Ordinal);
+
+        foreach (var item in items)
+        {
+            if (item is null)
+                continue;
+
+            var normalizedHash = NormalizeHash(item.Hash);
+            if (normalizedHash.Length == 0)
+                continue;
+
+            item.Hash = item.Hash.Trim();
+            if (index.TryGetValue(normalizedHash, out var existing))
+            {
+                MergeLikeCacheItem(existing, item);
+                duplicateCount++;
+                continue;
+            }
+
+            index.Add(normalizedHash, item);
+            result.Add(item);
+        }
+
+        return result;
+    }
+
+    private static void MergeLikeCacheItem(LikeSongCacheItem target, LikeSongCacheItem source)
+    {
+        if (target.FileId == 0 && source.FileId != 0)
+            target.FileId = source.FileId;
+        if (string.IsNullOrWhiteSpace(target.Name) && !string.IsNullOrWhiteSpace(source.Name))
+            target.Name = source.Name;
+        if (string.IsNullOrWhiteSpace(target.Singer) && !string.IsNullOrWhiteSpace(source.Singer))
+            target.Singer = source.Singer;
+        if (string.IsNullOrWhiteSpace(target.AlbumId) && !string.IsNullOrWhiteSpace(source.AlbumId))
+            target.AlbumId = source.AlbumId;
+        if (string.IsNullOrWhiteSpace(target.Cover) && !string.IsNullOrWhiteSpace(source.Cover))
+            target.Cover = source.Cover;
+        if (target.DurationSeconds <= 0 && source.DurationSeconds > 0)
+            target.DurationSeconds = source.DurationSeconds;
+        if ((target.Singers?.Count ?? 0) == 0 && source.Singers?.Count > 0)
+            target.Singers = source.Singers.AsValueEnumerable().ToList();
+        if (target.Privilege == 0 && source.Privilege != 0)
+            target.Privilege = source.Privilege;
+    }
+
+    private static string NormalizeHash(string? hash)
+    {
+        return string.IsNullOrWhiteSpace(hash) ? string.Empty : hash.Trim().ToLowerInvariant();
+    }
+
+    private bool HasLikeCache()
+    {
+        lock (_likeCacheStateLock)
+            return _latestCache != null;
+    }
+
+    private long GetLikeCacheMutationVersion()
+    {
+        lock (_likeCacheStateLock)
+            return _likeCacheMutationVersion;
+    }
+
+    private LikeCacheStateCounts GetLikeCacheStateCounts()
+    {
+        lock (_likeCacheStateLock)
+            return new LikeCacheStateCounts(_likedHashes.Count, _hashToFileId.Count);
+    }
+
+    private string GetLikeListIdForAction()
+    {
+        lock (_likeCacheStateLock)
+            return _likeListIdForAction;
+    }
+
+    private void SetLikeListIdForAction(string listId)
+    {
+        lock (_likeCacheStateLock)
+            _likeListIdForAction = listId;
+    }
+
+    private readonly record struct LikeCacheStateCounts(int HashCount, int FileIdCount);
 
     private string GetLikeCacheFilePath()
     {
