@@ -497,7 +497,7 @@ public partial class SongCollectionDetailView : UserControl
         var playingSong = Songs?
             .AsValueEnumerable()
             .OfType<SongItem>()
-            .FirstOrDefault(song => IsSameSong(song, currentSong));
+            .FirstOrDefault(song => song==currentSong);
 
         if (playingSong is null)
         {
@@ -581,7 +581,7 @@ public partial class SongCollectionDetailView : UserControl
                 return;
 
             foreach (var song in songs)
-                song.IsPlaying = IsSameSong(song, currentSong);
+                song.IsPlaying = song == currentSong;
         }
 
         if (Dispatcher.UIThread.CheckAccess())
@@ -590,17 +590,6 @@ public partial class SongCollectionDetailView : UserControl
             Dispatcher.UIThread.Post(Update);
     }
 
-    private static bool IsSameSong(SongItem candidate, SongItem? currentSong)
-    {
-        if (currentSong is null)
-            return false;
-
-        if (ReferenceEquals(candidate, currentSong))
-            return true;
-
-        return !string.IsNullOrWhiteSpace(candidate.Hash) &&
-               string.Equals(candidate.Hash, currentSong.Hash, StringComparison.OrdinalIgnoreCase);
-    }
 
     private void AdjustScrollPosition(SongItem playingSong)
     {
