@@ -129,7 +129,7 @@ public partial class SongItem : ObservableObject
     }
 
     public static bool operator ==(SongItem? a, SongItem? b) =>
-        (a is null && b is null) ||
+        ReferenceEquals(a, b) ||
         (!string.IsNullOrWhiteSpace(a?.LocalFilePath) && a.LocalFilePath == b?.LocalFilePath) ||
         (!string.IsNullOrWhiteSpace(a?.RemoteUrl) && a.RemoteUrl == b?.RemoteUrl && a.Hash == b.Hash);
 
