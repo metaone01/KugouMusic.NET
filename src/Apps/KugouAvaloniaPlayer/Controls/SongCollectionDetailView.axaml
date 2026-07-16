@@ -197,7 +197,7 @@
                                         ToolTip.Tip="{Binding #Root.HeroActionText}"
                                         ToolTip.ServiceEnabled="{Binding #Root.HasHeroActionText}"
                                         ToolTip.Placement="Top"
-                                        ToolTip.VerticalOffset="20">
+                                        ToolTip.VerticalOffset="-2">
                                     <StackPanel Orientation="Horizontal" Spacing="8">
                                         <Svg Classes="ThemeSvgIcon"
                                              Path="{Binding #Root.HeroActionSvgPath}"
@@ -218,7 +218,7 @@
                                         Cursor="Hand"
                                         ToolTip.Tip="批量操作"
                                         ToolTip.Placement="Top"
-                                        ToolTip.VerticalOffset="20">
+                                        ToolTip.VerticalOffset="-2">
                                     <Svg Classes="ThemeSvgIcon" Path="/Assets/FormatList.svg" Width="16" Height="16" />
                                 </Button>
                             </Grid>
