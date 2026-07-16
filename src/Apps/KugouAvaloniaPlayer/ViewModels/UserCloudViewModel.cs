@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Collections;
 using Avalonia.Controls.Notifications;
@@ -25,7 +26,10 @@ public partial class UserCloudViewModel(
     private const string DefaultSongCover = "avares://KugouAvaloniaPlayer/Assets/default_song.png";
 
     private int _currentPage = 1;
+    private CancellationTokenSource? _backgroundLoadCts;
+    private int _loadVersion;
     private bool _hasMoreSongs = true;
+    private bool _isBackgroundLoading;
 
     [ObservableProperty]
     public partial string Cover { get; set; } = DefaultCollectionCover;
@@ -53,6 +57,9 @@ public partial class UserCloudViewModel(
         if (IsLoading)
             return;
 
+        CancelBackgroundLoad();
+        var loadVersion = Interlocked.Increment(ref _loadVersion);
+
         if (!userClient.IsLoggedIn())
         {
             Songs.Clear();
@@ -69,9 +76,10 @@ public partial class UserCloudViewModel(
         _currentPage = 1;
         _hasMoreSongs = true;
 
+        var loaded = false;
         try
         {
-            await LoadPageInternalAsync(resetExisting: true);
+            loaded = await LoadPageInternalAsync(1, resetExisting: true, loadVersion);
         }
         catch (Exception ex)
         {
@@ -88,24 +96,25 @@ public partial class UserCloudViewModel(
         {
             IsLoading = false;
         }
+
+        if (loaded)
+            StartBackgroundLoad(loadVersion);
     }
 
     [RelayCommand]
     private async Task LoadMore()
     {
-        if (IsLoading || IsLoadingMore || !_hasMoreSongs || !userClient.IsLoggedIn())
+        if (IsLoading || IsLoadingMore || _isBackgroundLoading || !_hasMoreSongs || !userClient.IsLoggedIn())
             return;
 
-        _currentPage++;
         IsLoadingMore = true;
 
         try
         {
-            await LoadPageInternalAsync(resetExisting: false);
+            await LoadPageInternalAsync(_currentPage + 1, resetExisting: false, _loadVersion);
         }
         catch (Exception ex)
         {
-            _currentPage = Math.Max(1, _currentPage - 1);
             logger.LogError(ex, "加载更多云盘歌曲失败");
         }
         finally
@@ -114,9 +123,12 @@ public partial class UserCloudViewModel(
         }
     }
 
-    private async Task LoadPageInternalAsync(bool resetExisting)
+    private async Task<bool> LoadPageInternalAsync(int page, bool resetExisting, int loadVersion)
     {
-        var data = await userClient.GetCloudAsync(_currentPage, PageSize);
+        var data = await userClient.GetCloudAsync(page, PageSize);
+        if (!IsCurrentLoad(loadVersion))
+            return false;
+
         if (data == null)
         {
             _hasMoreSongs = false;
@@ -125,7 +137,7 @@ public partial class UserCloudViewModel(
                 Cover = DefaultCollectionCover;
                 Subtitle = "暂时无法读取云盘数据";
             }
-            return;
+            return false;
         }
 
         if (data.Status != 1)
@@ -137,7 +149,7 @@ public partial class UserCloudViewModel(
                 Subtitle = "云盘数据加载失败";
             }
             logger.LogWarning("加载云盘数据失败。status={Status}, errorCode={ErrorCode}", data.Status, data.ErrorCode);
-            return;
+            return false;
         }
 
         Subtitle = BuildSubtitle(data);
@@ -149,6 +161,8 @@ public partial class UserCloudViewModel(
         if (songItems.Count > 0)
             Songs.AddRange(songItems);
 
+        _currentPage = page;
+
         if (resetExisting)
         {
             Cover = songItems.AsValueEnumerable()
@@ -158,8 +172,75 @@ public partial class UserCloudViewModel(
                     ?? DefaultCollectionCover;
         }
 
-        if (songItems.Count < PageSize || (data.ListCount > 0 && Songs.Count >= data.ListCount))
-            _hasMoreSongs = false;
+        _hasMoreSongs = songItems.Count >= PageSize && (data.ListCount <= 0 || Songs.Count < data.ListCount);
+        return true;
+    }
+
+    private void StartBackgroundLoad(int loadVersion)
+    {
+        if (!IsCurrentLoad(loadVersion) || !_hasMoreSongs)
+            return;
+
+        CancelBackgroundLoad();
+
+        var cts = new CancellationTokenSource();
+        _backgroundLoadCts = cts;
+        _isBackgroundLoading = true;
+        _ = CompleteCloudInBackgroundAsync(loadVersion, cts);
+    }
+
+    private async Task CompleteCloudInBackgroundAsync(int loadVersion, CancellationTokenSource cts)
+    {
+        IsLoadingMore = true;
+        try
+        {
+            while (!cts.IsCancellationRequested && IsCurrentLoad(loadVersion) && _hasMoreSongs)
+            {
+                var loaded = await LoadPageInternalAsync(_currentPage + 1, resetExisting: false, loadVersion);
+                if (!loaded)
+                    break;
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(ex, "后台补全云盘歌曲失败。page={Page}", _currentPage + 1);
+        }
+        finally
+        {
+            if (ReferenceEquals(_backgroundLoadCts, cts))
+            {
+                _backgroundLoadCts = null;
+                _isBackgroundLoading = false;
+                IsLoadingMore = false;
+                cts.Dispose();
+            }
+        }
+    }
+
+    private bool IsCurrentLoad(int loadVersion)
+    {
+        return _loadVersion == loadVersion && userClient.IsLoggedIn();
+    }
+
+    private void CancelBackgroundLoad()
+    {
+        var cts = _backgroundLoadCts;
+        _backgroundLoadCts = null;
+        _isBackgroundLoading = false;
+        IsLoadingMore = false;
+
+        if (cts == null)
+            return;
+
+        try
+        {
+            cts.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+
+        cts.Dispose();
     }
 
     private static SongItem ToSongItem(UserCloudSong song)
