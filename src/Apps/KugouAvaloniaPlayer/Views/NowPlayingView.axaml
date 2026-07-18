@@ -145,6 +145,7 @@
                    IsHitTestVisible="False">
                 <Image Source="{Binding NowPlayingBackgroundImageSource, Converter={StaticResource LocalCachedBitmapConverter}, ConverterParameter=Original}"
                        asyncImageLoader:ImageLoader.Source="{Binding NowPlayingBackgroundImageSource, Converter={StaticResource RemoteImageSourceConverter}}"
+                       RenderOptions.BitmapInterpolationMode="HighQuality"
                        Stretch="UniformToFill"
                        Margin="-96"
                        Opacity="{Binding BackgroundImageOpacity}"
@@ -330,7 +331,7 @@
                                     MinHeight="220" MaxWidth="350" MaxHeight="350">
                         <Image Source="{Binding Player.DisplayedPlayingSong.Cover, Converter={StaticResource LocalCachedBitmapConverter}, ConverterParameter=Original}"
                                asyncImageLoader:ImageLoader.Source="{Binding Player.DisplayedPlayingSong.Cover, Converter={StaticResource RemoteImageSourceConverter}}"
-                               behaviors:ImageRenderOptions.InterpolationSource="{Binding Player.DisplayedPlayingSong.Cover}"
+                               RenderOptions.BitmapInterpolationMode="HighQuality"
                                Stretch="UniformToFill" />
                     </suki:GlassCard>
 

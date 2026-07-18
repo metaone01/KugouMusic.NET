@@ -403,6 +403,7 @@ public partial class DiscoverViewModel : PageViewModelBase
         {
             if (version == _playlistLoadVersion)
                 ShowWarning("加载推荐歌单失败", ex.Message);
+            _logger.LogWarning("加载推荐歌单失败,{ex}",ex.Message);
         }
         finally
         {

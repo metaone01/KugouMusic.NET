@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Threading;
 using ATL;
 using Avalonia.Data.Converters;
 using Avalonia.Media.Imaging;
@@ -12,9 +14,12 @@ namespace KugouAvaloniaPlayer.Converters;
 public sealed class LocalCachedBitmapConverter : IValueConverter
 {
     private const int DefaultDecodeWidth = 96;
+    private const int MaxCacheEntries = 256;
     private const string OriginalSizeParameter = "Original";
     private const string DefaultSongCover = "avares://KugouAvaloniaPlayer/Assets/default_song.png";
-    private static readonly ConcurrentDictionary<string, WeakReference<Bitmap>> Cache = new(StringComparer.Ordinal);
+    private static readonly Lock CacheGate = new();
+    private static readonly Dictionary<string, LinkedListNode<CacheEntry>> Cache = new(StringComparer.Ordinal);
+    private static readonly LinkedList<CacheEntry> CacheUsage = [];
     private static readonly ConcurrentDictionary<int, Lazy<Bitmap>> DefaultBitmapCache = new();
 
     public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
@@ -23,42 +28,39 @@ public sealed class LocalCachedBitmapConverter : IValueConverter
         var decodeWidth = ResolveDecodeWidth(parameter);
         var source = value as string;
         if (string.IsNullOrWhiteSpace(source))
-            return GetDefaultBitmap(decodeWidth);
+            return GetDefaultBitmap(decodeWidth, decodeOriginalSize);
 
         var cacheKey = BuildCacheKey(source, decodeWidth, decodeOriginalSize);
 
-        if (Cache.TryGetValue(cacheKey, out var weakReference) &&
-            weakReference.TryGetTarget(out var cached))
-        {
+        if (TryGetCachedBitmap(cacheKey, out var cached))
             return cached;
-        }
 
         if (LocalImageSourceHelper.TryGetEmbeddedCoverFilePath(source, out var embeddedTrackPath))
         {
             var bitmap = TryDecodeEmbeddedCoverBitmap(embeddedTrackPath!, decodeWidth, decodeOriginalSize);
             if (bitmap != null)
-                Cache[cacheKey] = new WeakReference<Bitmap>(bitmap);
+                CacheBitmap(cacheKey, bitmap);
             else
-                Cache.TryRemove(cacheKey, out _);
+                RemoveCachedBitmap(cacheKey);
 
-            return bitmap ?? GetDefaultBitmap(decodeWidth);
+            return bitmap ?? GetDefaultBitmap(decodeWidth, decodeOriginalSize);
         }
 
         var path = LocalImageSourceHelper.GetLocalFilePath(source);
         if (path == null)
-            return GetDefaultBitmap(decodeWidth);
+            return GetDefaultBitmap(decodeWidth, decodeOriginalSize);
 
         try
         {
             using var stream = File.OpenRead(path);
             var bitmap = DecodeBitmap(stream, decodeWidth, decodeOriginalSize);
-            Cache[cacheKey] = new WeakReference<Bitmap>(bitmap);
+            CacheBitmap(cacheKey, bitmap);
             return bitmap;
         }
         catch
         {
-            Cache.TryRemove(cacheKey, out _);
-            return GetDefaultBitmap(decodeWidth);
+            RemoveCachedBitmap(cacheKey);
+            return GetDefaultBitmap(decodeWidth, decodeOriginalSize);
         }
     }
 
@@ -120,12 +122,67 @@ public sealed class LocalCachedBitmapConverter : IValueConverter
             : source + "|w=" + decodeWidth.ToString(CultureInfo.InvariantCulture);
     }
 
-    private static Bitmap GetDefaultBitmap(int decodeWidth)
+    private static bool TryGetCachedBitmap(string cacheKey, out Bitmap? bitmap)
     {
-        return DefaultBitmapCache.GetOrAdd(decodeWidth, width => new Lazy<Bitmap>(() =>
+        lock (CacheGate)
+        {
+            if (!Cache.TryGetValue(cacheKey, out var node))
+            {
+                bitmap = null;
+                return false;
+            }
+
+            if (!node.Value.Bitmap.TryGetTarget(out bitmap))
+            {
+                Cache.Remove(cacheKey);
+                CacheUsage.Remove(node);
+                return false;
+            }
+
+            CacheUsage.Remove(node);
+            CacheUsage.AddFirst(node);
+            return true;
+        }
+    }
+
+    private static void CacheBitmap(string cacheKey, Bitmap bitmap)
+    {
+        lock (CacheGate)
+        {
+            if (Cache.Remove(cacheKey, out var existingNode))
+                CacheUsage.Remove(existingNode);
+
+            var entry = new CacheEntry(cacheKey, new WeakReference<Bitmap>(bitmap));
+            Cache[cacheKey] = CacheUsage.AddFirst(entry);
+
+            while (Cache.Count > MaxCacheEntries && CacheUsage.Last is { } oldestNode)
+            {
+                Cache.Remove(oldestNode.Value.Key);
+                CacheUsage.RemoveLast();
+            }
+        }
+    }
+
+    private static void RemoveCachedBitmap(string cacheKey)
+    {
+        lock (CacheGate)
+        {
+            if (Cache.Remove(cacheKey, out var node))
+                CacheUsage.Remove(node);
+        }
+    }
+
+    private static Bitmap GetDefaultBitmap(int decodeWidth, bool decodeOriginalSize)
+    {
+        var cacheKey = decodeOriginalSize ? 0 : decodeWidth;
+        return DefaultBitmapCache.GetOrAdd(cacheKey, width => new Lazy<Bitmap>(() =>
         {
             using var stream = AssetLoader.Open(new Uri(DefaultSongCover));
-            return Bitmap.DecodeToWidth(stream, width, BitmapInterpolationMode.LowQuality);
+            return decodeOriginalSize
+                ? new Bitmap(stream)
+                : Bitmap.DecodeToWidth(stream, width, BitmapInterpolationMode.LowQuality);
         })).Value;
     }
+
+    private sealed record CacheEntry(string Key, WeakReference<Bitmap> Bitmap);
 }

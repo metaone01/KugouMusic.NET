@@ -12,7 +12,8 @@ public sealed class RemoteImageSourceConverter : IValueConverter
         if (string.IsNullOrWhiteSpace(source))
             return null;
 
-        return LocalImageSourceHelper.GetLocalFilePath(source) == null
+        return !LocalImageSourceHelper.TryGetEmbeddedCoverFilePath(source, out _) &&
+               LocalImageSourceHelper.GetLocalFilePath(source) == null
             ? source
             : null;
     }
@@ -22,4 +23,3 @@ public sealed class RemoteImageSourceConverter : IValueConverter
         throw new NotSupportedException();
     }
 }
-
