@@ -143,7 +143,7 @@
                    VerticalAlignment="Top"
                    ClipToBounds="False"
                    IsHitTestVisible="False">
-                <Image Source="{Binding NowPlayingBackgroundImageSource, Converter={StaticResource LocalCachedBitmapConverter}, ConverterParameter=1200}"
+                <Image Source="{Binding NowPlayingBackgroundImageSource, Converter={StaticResource LocalCachedBitmapConverter}, ConverterParameter=Original}"
                        asyncImageLoader:ImageLoader.Source="{Binding NowPlayingBackgroundImageSource, Converter={StaticResource RemoteImageSourceConverter}}"
                        Stretch="UniformToFill"
                        Margin="-96"
@@ -328,7 +328,7 @@
                     </StackPanel.RenderTransform>
                     <suki:GlassCard CornerRadius="20" Padding="0" Width="320" Height="320" MinWidth="220"
                                     MinHeight="220" MaxWidth="350" MaxHeight="350">
-                        <Image Source="{Binding Player.DisplayedPlayingSong.Cover, Converter={StaticResource LocalCachedBitmapConverter}, ConverterParameter=640}"
+                        <Image Source="{Binding Player.DisplayedPlayingSong.Cover, Converter={StaticResource LocalCachedBitmapConverter}, ConverterParameter=Original}"
                                asyncImageLoader:ImageLoader.Source="{Binding Player.DisplayedPlayingSong.Cover, Converter={StaticResource RemoteImageSourceConverter}}"
                                behaviors:ImageRenderOptions.InterpolationSource="{Binding Player.DisplayedPlayingSong.Cover}"
                                Stretch="UniformToFill" />

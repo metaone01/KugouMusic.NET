@@ -12,18 +12,20 @@ namespace KugouAvaloniaPlayer.Converters;
 public sealed class LocalCachedBitmapConverter : IValueConverter
 {
     private const int DefaultDecodeWidth = 96;
+    private const string OriginalSizeParameter = "Original";
     private const string DefaultSongCover = "avares://KugouAvaloniaPlayer/Assets/default_song.png";
     private static readonly ConcurrentDictionary<string, WeakReference<Bitmap>> Cache = new(StringComparer.Ordinal);
     private static readonly ConcurrentDictionary<int, Lazy<Bitmap>> DefaultBitmapCache = new();
 
     public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
+        var decodeOriginalSize = IsOriginalSizeRequested(parameter);
         var decodeWidth = ResolveDecodeWidth(parameter);
         var source = value as string;
         if (string.IsNullOrWhiteSpace(source))
             return GetDefaultBitmap(decodeWidth);
 
-        var cacheKey = BuildCacheKey(source, decodeWidth);
+        var cacheKey = BuildCacheKey(source, decodeWidth, decodeOriginalSize);
 
         if (Cache.TryGetValue(cacheKey, out var weakReference) &&
             weakReference.TryGetTarget(out var cached))
@@ -33,7 +35,7 @@ public sealed class LocalCachedBitmapConverter : IValueConverter
 
         if (LocalImageSourceHelper.TryGetEmbeddedCoverFilePath(source, out var embeddedTrackPath))
         {
-            var bitmap = TryDecodeEmbeddedCoverBitmap(embeddedTrackPath!, decodeWidth);
+            var bitmap = TryDecodeEmbeddedCoverBitmap(embeddedTrackPath!, decodeWidth, decodeOriginalSize);
             if (bitmap != null)
                 Cache[cacheKey] = new WeakReference<Bitmap>(bitmap);
             else
@@ -49,7 +51,7 @@ public sealed class LocalCachedBitmapConverter : IValueConverter
         try
         {
             using var stream = File.OpenRead(path);
-            var bitmap = Bitmap.DecodeToWidth(stream, decodeWidth, BitmapInterpolationMode.LowQuality);
+            var bitmap = DecodeBitmap(stream, decodeWidth, decodeOriginalSize);
             Cache[cacheKey] = new WeakReference<Bitmap>(bitmap);
             return bitmap;
         }
@@ -65,7 +67,7 @@ public sealed class LocalCachedBitmapConverter : IValueConverter
         throw new NotSupportedException();
     }
 
-    private static Bitmap? TryDecodeEmbeddedCoverBitmap(string trackPath, int decodeWidth)
+    private static Bitmap? TryDecodeEmbeddedCoverBitmap(string trackPath, int decodeWidth, bool decodeOriginalSize)
     {
         try
         {
@@ -75,7 +77,7 @@ public sealed class LocalCachedBitmapConverter : IValueConverter
                 return null;
 
             using var stream = new MemoryStream(picture.PictureData, writable: false);
-            return Bitmap.DecodeToWidth(stream, decodeWidth, BitmapInterpolationMode.LowQuality);
+            return DecodeBitmap(stream, decodeWidth, decodeOriginalSize);
         }
         catch
         {
@@ -98,9 +100,24 @@ public sealed class LocalCachedBitmapConverter : IValueConverter
         return DefaultDecodeWidth;
     }
 
-    private static string BuildCacheKey(string source, int decodeWidth)
+    private static bool IsOriginalSizeRequested(object? parameter)
     {
-        return source + "|w=" + decodeWidth.ToString(CultureInfo.InvariantCulture);
+        return parameter is string value &&
+               string.Equals(value, OriginalSizeParameter, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static Bitmap DecodeBitmap(Stream stream, int decodeWidth, bool decodeOriginalSize)
+    {
+        return decodeOriginalSize
+            ? new Bitmap(stream)
+            : Bitmap.DecodeToWidth(stream, decodeWidth, BitmapInterpolationMode.LowQuality);
+    }
+
+    private static string BuildCacheKey(string source, int decodeWidth, bool decodeOriginalSize)
+    {
+        return decodeOriginalSize
+            ? source + "|original"
+            : source + "|w=" + decodeWidth.ToString(CultureInfo.InvariantCulture);
     }
 
     private static Bitmap GetDefaultBitmap(int decodeWidth)
