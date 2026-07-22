@@ -15,6 +15,8 @@ internal sealed class LrcLyricParser : ILyricParser
     {
         var source = content.AsSpan();
         var result = new List<LyricLineViewModel>();
+        var previousPrimaryLines = new List<LyricLineViewModel>();
+        var currentPrimaryLines = new List<LyricLineViewModel>();
 
         foreach (var lineRange in source.SplitAny("\r\n"))
         {
@@ -34,11 +36,23 @@ internal sealed class LrcLyricParser : ILyricParser
                 continue;
 
             var text = line[lastTimestampEnd..].Trim().ToString();
+            currentPrimaryLines.Clear();
             foreach (var match in TimestampRegex.EnumerateMatches(line))
             {
                 var timestamp = line.Slice(match.Index, match.Length);
-                result.Add(CreateLine(text, ParseTimestamp(timestamp)));
+                var lyricLine = CreateLine(text, ParseTimestamp(timestamp));
+                var translationTarget = FindTranslationTarget(previousPrimaryLines, lyricLine.StartTime);
+                if (translationTarget != null)
+                {
+                    translationTarget.Translation = lyricLine.Content;
+                    continue;
+                }
+
+                result.Add(lyricLine);
+                currentPrimaryLines.Add(lyricLine);
             }
+
+            (previousPrimaryLines, currentPrimaryLines) = (currentPrimaryLines, previousPrimaryLines);
         }
 
         result.Sort(static (left, right) => left.StartTime.CompareTo(right.StartTime));
@@ -53,6 +67,19 @@ internal sealed class LrcLyricParser : ILyricParser
         }
 
         return result;
+    }
+
+    private static LyricLineViewModel? FindTranslationTarget(
+        List<LyricLineViewModel> previousPrimaryLines,
+        double startTime)
+    {
+        foreach (var line in previousPrimaryLines)
+        {
+            if (line.StartTime == startTime && string.IsNullOrEmpty(line.Translation))
+                return line;
+        }
+
+        return null;
     }
 
     private static long ParseTimestamp(ReadOnlySpan<char> timestamp)
